@@ -12,3 +12,5 @@ greenlet==3.0.1
 numpy>=1.26.0
 pytest==7.4.3
 httpx>=0.24.0
+torch>=2.0.0
+pyyaml>=6.0
