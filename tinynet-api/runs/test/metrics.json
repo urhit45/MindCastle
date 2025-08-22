@@ -1,0 +1,7 @@
+{
+  "cat_micro_f1": 0.52,
+  "cat_macro_f1": 0.37629937629937626,
+  "state_accuracy": 1.0,
+  "combined_score": 1.52,
+  "val_loss": 4.757518291473389
+}
