@@ -1,0 +1,52 @@
+# TinyNet Labels Configuration
+# 
+# SAFETY NOTES:
+# - Categories are used throughout the system for organization and filtering
+# - Renaming categories can break existing data relationships
+# - To safely rename: 1) Add new name, 2) Migrate data, 3) Remove old name
+# - To add new categories: simply append to the list
+# - States and templates are more flexible and can be modified freely
+
+categories:
+  - Fitness
+  - Running
+  - Strength
+  - Music
+  - Guitar
+  - Learning
+  - AI
+  - Admin
+  - Finance
+  - Social
+  - Health
+  - Cooking
+  - Travel
+  - Work
+  - SideProject
+  - Design
+  - Reading
+  - Writing
+  - Mindfulness
+  - Household
+
+states: 
+  - start
+  - continue
+  - pause
+  - end
+  - blocked
+  - idea
+
+next_step_templates:
+  - PracticeForDuration
+  - RepeatTask
+  - IncreaseVolume
+  - ScheduleFollowUp
+  - AttachLink
+  - ReviewNotes
+  - OutlineThreeBullets
+  - BookAppointment
+  - BuySupplies
+  - CreateSubtasks
+  - SetReminder
+  - LogReflection
