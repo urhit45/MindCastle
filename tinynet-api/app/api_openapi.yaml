@@ -1,0 +1,504 @@
+openapi: 3.1.0
+info:
+  title: TinyNet API
+  description: A chat-first mind web API for TinyNet
+  version: 0.1.0
+  contact:
+    name: TinyNet Team
+    email: team@tinynet.dev
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.tinynet.dev
+    description: Production server
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      description: Check if the API is running
+      tags:
+        - health
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  service:
+                    type: string
+                    example: "tinynet-api"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /classify:
+    post:
+      summary: Classify text
+      description: Classify text into categories, states, and suggest next steps
+      tags:
+        - classify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  description: Text to classify
+                  example: "Ran 2 miles, shin tight"
+                contextNodeId:
+                  type: string
+                  format: uuid
+                  description: Optional context node ID
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: Classification results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label:
+                          type: string
+                          example: "Fitness"
+                        score:
+                          type: number
+                          format: float
+                          minimum: 0
+                          maximum: 1
+                          example: 0.95
+                  state:
+                    type: object
+                    properties:
+                      label:
+                        type: string
+                        example: "continue"
+                      score:
+                        type: number
+                        format: float
+                        minimum: 0
+                        maximum: 1
+                        example: 0.87
+                  linkHints:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nodeId:
+                          type: string
+                          format: uuid
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+                        title:
+                          type: string
+                          example: "Running Progress"
+                        similarity:
+                          type: number
+                          format: float
+                          minimum: 0
+                          maximum: 1
+                          example: 0.78
+                  nextStep:
+                    type: object
+                    properties:
+                      template:
+                        type: string
+                        example: "PracticeForDuration"
+                      slots:
+                        type: object
+                        additionalProperties: true
+                        example:
+                          duration: "30 minutes"
+                          activity: "stretching"
+                      confidence:
+                        type: number
+                        format: float
+                        minimum: 0
+                        maximum: 1
+                        example: 0.82
+                  uncertain:
+                    type: boolean
+                    description: Whether the classification is uncertain
+                    example: false
+
+  /correct:
+    post:
+      summary: Correct classification
+      description: Provide corrections for text classification
+      tags:
+        - classify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  description: Original text that was classified
+                  example: "Ran 2 miles, shin tight"
+                categories:
+                  type: array
+                  items:
+                    type: string
+                  description: Corrected categories
+                  example: ["Fitness", "Running"]
+                state:
+                  type: string
+                  description: Corrected state
+                  example: "blocked"
+                linkTo:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Node ID to link to
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+                nextStepTemplate:
+                  type: string
+                  nullable: true
+                  description: Next step template
+                  example: "PracticeForDuration"
+      responses:
+        '200':
+          description: Correction accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+  /train:
+    post:
+      summary: Train model
+      description: Provide training samples to improve classification
+      tags:
+        - classify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - samples
+              properties:
+                samples:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - text
+                      - categories
+                      - state
+                    properties:
+                      text:
+                        type: string
+                        description: Training text
+                        example: "Ran 2 miles, shin tight"
+                      categories:
+                        type: array
+                        items:
+                          type: string
+                        description: Correct categories
+                        example: ["Fitness", "Running"]
+                      state:
+                        type: string
+                        description: Correct state
+                        example: "continue"
+      responses:
+        '200':
+          description: Training samples accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  metrics:
+                    type: object
+                    properties:
+                      samplesProcessed:
+                        type: integer
+                        example: 10
+                      accuracy:
+                        type: number
+                        format: float
+                        example: 0.85
+
+  /nodes/search:
+    get:
+      summary: Search nodes
+      description: Search for nodes by query
+      tags:
+        - nodes
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+          example: "run"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          example: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+                        title:
+                          type: string
+                          example: "Running Progress"
+                        hub:
+                          type: boolean
+                          description: Whether this is a hub node
+                          example: false
+                        score:
+                          type: number
+                          format: float
+                          minimum: 0
+                          maximum: 1
+                          example: 0.92
+
+  /nodes/{id}:
+    get:
+      summary: Get node details
+      description: Get detailed information about a specific node
+      tags:
+        - nodes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Node ID
+          schema:
+            type: string
+            format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: Node details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+                  title:
+                    type: string
+                    example: "Running Progress"
+                  hub:
+                    type: boolean
+                    description: Whether this is a hub node
+                    example: false
+                  status:
+                    type: string
+                    example: "continue"
+                  lastCheckpoint:
+                    type: object
+                    nullable: true
+                    properties:
+                      text:
+                        type: string
+                        example: "Ran 2 miles today"
+                      date:
+                        type: string
+                        format: date-time
+                        example: "2024-01-15T10:30:00Z"
+                  related:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+                        title:
+                          type: string
+                          example: "Fitness Goals"
+
+  /nodes/{id}/logs:
+    get:
+      summary: Get node logs
+      description: Get progress logs for a specific node
+      tags:
+        - nodes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Node ID
+          schema:
+            type: string
+            format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of logs
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+          example: 20
+      responses:
+        '200':
+          description: Node logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        time:
+                          type: string
+                          format: date-time
+                          example: "2024-01-15T10:30:00Z"
+                        text:
+                          type: string
+                          example: "Ran 2 miles today, feeling good"
+                        nextStep:
+                          type: string
+                          nullable: true
+                          example: "PracticeForDuration"
+                        state:
+                          type: string
+                          example: "continue"
+
+  /home/review:
+    get:
+      summary: Get home review items
+      description: Get items that need review on the home page
+      tags:
+        - home
+      responses:
+        '200':
+          description: Review items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+                        title:
+                          type: string
+                          example: "Running Progress"
+                        reason:
+                          type: string
+                          enum: [blocked, nextStep, stale]
+                          description: Reason for review
+                          example: "blocked"
+                        nodeId:
+                          type: string
+                          format: uuid
+                          example: "123e4567-e89b-12d3-a456-426614174000"
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request"
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+tags:
+  - name: health
+    description: Health check endpoints
+  - name: classify
+    description: Text classification endpoints
+  - name: nodes
+    description: Node management endpoints
+  - name: home
+    description: Home page endpoints
