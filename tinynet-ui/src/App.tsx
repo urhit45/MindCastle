@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import * as api from "./api";
+import { Onboarding } from "./Onboarding";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -9,6 +11,7 @@ interface ProgressItem {
 
 interface Artifact {
   id: string;
+  node_id?: string;  // backend Node UUID, set after first API sync
   title: string;
   subtitle: string;
   status: string;
@@ -39,6 +42,12 @@ const STATUS_META: Record<string, { dot: string; label: string }> = {
   blocked:  { dot: "#e0637a", label: "Blocked" },
   planned:  { dot: "#9b7fe8", label: "Planned" },
   planning: { dot: "#c8a96e", label: "Planning" },
+  // TinyNet-classified states
+  start:    { dot: "#5b8dee", label: "Start" },
+  continue: { dot: "#a3d977", label: "Continue" },
+  pause:    { dot: "#c8a96e", label: "Pause" },
+  end:      { dot: "#555",    label: "End" },
+  idea:     { dot: "#9b7fe8", label: "Idea" },
 };
 
 const PALETTE = [
@@ -500,13 +509,150 @@ function ArtifactCard({ artifact, color, onSelect, selected, onEdit }: {
   );
 }
 
+// ─── LOG PANEL ───────────────────────────────────────────────────────────────
+
+function LogPanel({ artifact, color, onStatusUpdate }: {
+  artifact: Artifact;
+  color: string;
+  onStatusUpdate: (status: string, nextStep: string) => void;
+}) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<api.ClassifyResult | null>(null);
+  const [logs, setLogs] = useState<api.ApiLog[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load existing logs if artifact has a backend node
+  useEffect(() => {
+    if (!artifact.node_id) return;
+    api.getLogs(artifact.node_id)
+      .then(r => setLogs(r.items))
+      .catch(() => {}); // API offline is fine for MVP
+  }, [artifact.node_id]);
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const classified = await api.classifyText(text);
+      setResult(classified);
+
+      if (artifact.node_id) {
+        const log = await api.addLog(
+          artifact.node_id,
+          text,
+          classified.state.label,
+          classified.nextStep.template,
+        );
+        setLogs(prev => [log, ...prev]);
+        onStatusUpdate(classified.state.label, classified.nextStep.template);
+      }
+      setText("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 20, borderTop: "1px solid #1a1a1a", paddingTop: 16 }}>
+      <div style={{ fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#333", marginBottom: 10 }}>
+        Log Progress
+      </div>
+
+      {!artifact.node_id && (
+        <div style={{ fontSize: 10, color: "#333", fontStyle: "italic", marginBottom: 8 }}>
+          Save this artifact first to enable logging.
+        </div>
+      )}
+
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(); }}
+        placeholder="What happened? What's next?  (⌘↵ to submit)"
+        disabled={!artifact.node_id || loading}
+        rows={3}
+        style={{
+          width: "100%", background: "#111", border: "1px solid #1e1e1e",
+          color: "#c8c4bc", fontSize: 11, padding: "9px 12px", borderRadius: 3,
+          fontFamily: "'DM Mono', monospace", outline: "none", resize: "vertical",
+          opacity: !artifact.node_id ? 0.4 : 1,
+        }}
+      />
+      <button
+        onClick={submit}
+        disabled={!artifact.node_id || loading || !text.trim()}
+        style={{
+          marginTop: 6, background: `${color}18`, border: `1px solid ${color}44`,
+          color, borderRadius: 3, padding: "6px 14px", cursor: "pointer",
+          fontSize: 10, letterSpacing: "0.1em", transition: "all 0.2s",
+          opacity: (!artifact.node_id || !text.trim()) ? 0.4 : 1,
+        }}
+      >
+        {loading ? "Classifying..." : "Classify & Log"}
+      </button>
+
+      {error && (
+        <div style={{ marginTop: 8, fontSize: 10, color: "#e0637a" }}>
+          {error.includes("fetch") ? "API offline — log not saved" : error}
+        </div>
+      )}
+
+      {result && (
+        <div style={{ marginTop: 10, padding: 12, background: "#0d0d0d", border: `1px solid ${color}22`, borderRadius: 3 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+            {result.categories.map(c => (
+              <span key={c.label} style={{
+                fontSize: 9, padding: "2px 7px", background: `${color}18`,
+                border: `1px solid ${color}33`, borderRadius: 2, color,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+              }}>{c.label} {Math.round(c.score * 100)}%</span>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+            <StatusDot status={result.state.label} />
+            <span style={{ color: "#555" }}>→ {result.nextStep.template}</span>
+          </div>
+        </div>
+      )}
+
+      {logs.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#2a2a2a", marginBottom: 8 }}>
+            Recent Logs
+          </div>
+          {logs.slice(0, 5).map(l => (
+            <div key={l.id} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #111" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <StatusDot status={l.state} />
+                <span style={{ fontSize: 9, color: "#2a2a2a" }}>
+                  {new Date(l.time).toLocaleDateString()}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: "#555", lineHeight: 1.5 }}>{l.text}</div>
+              {l.nextStep && (
+                <div style={{ fontSize: 9, color: "#333", marginTop: 3 }}>→ {l.nextStep}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ARTIFACT DETAIL ─────────────────────────────────────────────────────────
 
-function ArtifactDetail({ artifact, color, onClose, onEdit }: {
+function ArtifactDetail({ artifact, color, onClose, onEdit, onStatusUpdate }: {
   artifact: Artifact;
   color: string;
   onClose: () => void;
   onEdit: (a: Artifact) => void;
+  onStatusUpdate: (status: string, nextStep: string) => void;
 }) {
   return (
     <div style={{
@@ -557,6 +703,8 @@ function ArtifactDetail({ artifact, color, onClose, onEdit }: {
           <div style={{ fontSize: 12, color: "#999", lineHeight: 1.6 }}>{artifact.next}</div>
         </div>
       )}
+
+      <LogPanel artifact={artifact} color={color} onStatusUpdate={onStatusUpdate} />
     </div>
   );
 }
@@ -573,19 +721,45 @@ function EngineView({ engine, onUpdateEngine, onDeleteEngine }: {
   const [editingEngine, setEditingEngine] = useState(false);
   const [editingArtifact, setEditingArtifact] = useState<Artifact | null>(null);
 
-  const saveArtifact = (updated: Artifact) => {
-    const artifacts = engine.artifacts.find(a => a.id === updated.id)
-      ? engine.artifacts.map(a => a.id === updated.id ? updated : a)
-      : [...engine.artifacts, updated];
+  const saveArtifact = async (updated: Artifact) => {
+    let synced = updated;
+    // Sync title + status to backend node (fire-and-forget; localStorage is source of truth)
+    if (updated.title) {
+      try {
+        if (!updated.node_id) {
+          const node = await api.createNode(updated.title, false, updated.status);
+          synced = { ...updated, node_id: node.id };
+        } else {
+          await api.updateNode(updated.node_id, { title: updated.title, status: updated.status });
+        }
+      } catch {
+        // API offline — continue with localStorage only
+      }
+    }
+    const artifacts = engine.artifacts.find(a => a.id === synced.id)
+      ? engine.artifacts.map(a => a.id === synced.id ? synced : a)
+      : [...engine.artifacts, synced];
     onUpdateEngine({ ...engine, artifacts });
     setEditingArtifact(null);
-    if (selectedArtifact?.id === updated.id) setSelectedArtifact(updated);
+    if (selectedArtifact?.id === synced.id) setSelectedArtifact(synced);
   };
 
   const deleteArtifact = (id: string) => {
+    const artifact = engine.artifacts.find(a => a.id === id);
+    if (artifact?.node_id) {
+      api.deleteNode(artifact.node_id).catch(() => {});
+    }
     onUpdateEngine({ ...engine, artifacts: engine.artifacts.filter(a => a.id !== id) });
     setEditingArtifact(null);
     if (selectedArtifact?.id === id) setSelectedArtifact(null);
+  };
+
+  const handleStatusUpdate = (artifactId: string, status: string, next: string) => {
+    const updated = engine.artifacts.map(a =>
+      a.id === artifactId ? { ...a, status, next } : a
+    );
+    onUpdateEngine({ ...engine, artifacts: updated });
+    setSelectedArtifact(prev => prev?.id === artifactId ? { ...prev, status, next } : prev);
   };
 
   return (
@@ -673,6 +847,7 @@ function EngineView({ engine, onUpdateEngine, onDeleteEngine }: {
             color={engine.color}
             onClose={() => setSelectedArtifact(null)}
             onEdit={art => setEditingArtifact(art)}
+            onStatusUpdate={(status, next) => handleStatusUpdate(selectedArtifact.id, status, next)}
           />
         )}
       </div>
@@ -817,7 +992,10 @@ export default function MindCastle() {
               onUpdateEngine={updateEngine}
               onDeleteEngine={deleteEngine}
             />
-          : <EmptyState onAdd={() => setAddingEngine(true)} />
+          : <Onboarding
+              onComplete={(imported) => setEngines(imported)}
+              onSkip={() => setAddingEngine(true)}
+            />
         }
       </div>
 
