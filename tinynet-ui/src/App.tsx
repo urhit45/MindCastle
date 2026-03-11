@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "./api";
+import { Onboarding } from "./Onboarding";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -991,7 +992,10 @@ export default function MindCastle() {
               onUpdateEngine={updateEngine}
               onDeleteEngine={deleteEngine}
             />
-          : <EmptyState onAdd={() => setAddingEngine(true)} />
+          : <Onboarding
+              onComplete={(imported) => setEngines(imported)}
+              onSkip={() => setAddingEngine(true)}
+            />
         }
       </div>
 
