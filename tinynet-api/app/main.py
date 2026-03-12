@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from .db import init_db, close_db, AsyncSessionLocal
 from .config import settings
-from .routers import classify, nodes, home
+from .routers import classify, nodes, home, reason
 from .models import User
 from .ml.model_service import model_service
 
@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(classify.router, tags=["classify"])
 app.include_router(nodes.router, tags=["nodes"])
 app.include_router(home.router, tags=["home"])
+app.include_router(reason.router, tags=["reasoning"])
 
 
 async def _ensure_default_user():

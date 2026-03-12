@@ -103,6 +103,41 @@ class Todo(TodoBase):
         from_attributes = True
 
 
+# Reasoning schemas
+class ReasonContext(BaseModel):
+    recent_nodes: Optional[List[dict]] = Field(default_factory=list, description="Recent relevant nodes")
+    last_steps: Optional[List[str]] = Field(default_factory=list, description="Last completed steps")
+    constraints: Optional[dict] = Field(default_factory=dict, description="Time/effort constraints")
+
+
+class ReasonPrediction(BaseModel):
+    cats: List[str] = Field(..., description="Predicted categories")
+    state: str = Field(..., description="Predicted state")
+
+
+class ReasonRequest(BaseModel):
+    text: str = Field(..., description="Input text to reason about")
+    pred: ReasonPrediction = Field(..., description="Prediction results")
+    context: Optional[ReasonContext] = Field(default_factory=ReasonContext, description="Context information")
+
+
+class NextStepTemplate(BaseModel):
+    template: str = Field(..., description="Next step template name")
+    slots: Optional[dict] = Field(default_factory=dict, description="Template slot values")
+
+
+class LinkSuggestion(BaseModel):
+    nodeId: str = Field(..., description="Suggested node ID to link to")
+    reason: str = Field(..., description="Reason for linking")
+
+
+class ReasonResponse(BaseModel):
+    subtasks: List[str] = Field(..., description="Suggested subtasks")
+    blockers: List[str] = Field(..., description="Identified blockers")
+    next_step: NextStepTemplate = Field(..., description="Recommended next step")
+    link_to: List[LinkSuggestion] = Field(default_factory=list, description="Suggested node links")
+
+
 # Update schemas
 class UserUpdate(BaseModel):
     email: Optional[str] = None

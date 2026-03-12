@@ -3,7 +3,6 @@ SQLAlchemy models for TinyNet
 """
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, Index
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .db import Base
@@ -16,7 +15,7 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime, default=func.now())
     
     # Relationships
     nodes = relationship("Node", back_populates="user")
@@ -27,12 +26,12 @@ class Node(Base):
     """Node model for mind mapping"""
     __tablename__ = "nodes"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
     is_hub = Column(Boolean, default=False)
     status = Column(String, nullable=False)  # Using the states from config
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Relationships
@@ -48,8 +47,8 @@ class Link(Base):
     __tablename__ = "links"
     
     id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
-    target_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
+    source_id = Column(String(36), ForeignKey("nodes.id"), nullable=False)
+    target_id = Column(String(36), ForeignKey("nodes.id"), nullable=False)
     strength = Column(Float, default=1.0)
     
     # Relationships
@@ -62,8 +61,8 @@ class ProgressLog(Base):
     __tablename__ = "progress_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    node_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    node_id = Column(String(36), ForeignKey("nodes.id"), nullable=False)
+    created_at = Column(DateTime, default=func.now())
     text = Column(Text, nullable=False)
     next_step = Column(String, nullable=True)  # Using templates from config
     state = Column(String, nullable=False)  # Using states from config
@@ -79,9 +78,9 @@ class Todo(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     status = Column(String, nullable=False)
-    due_at = Column(DateTime(timezone=True), nullable=True)
-    node_id = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    due_at = Column(DateTime, nullable=True)
+    node_id = Column(String(36), ForeignKey("nodes.id"), nullable=True)
+    created_at = Column(DateTime, default=func.now())
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Relationships
