@@ -56,19 +56,22 @@ export default function ApiDemo() {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">TinyNet API Demo</h2>
+    <div className="panel demo-panel">
+      <div className="panel-header">
+        <h2>Scout Console</h2>
+        <p>Probe classify, reason, and live corrections</p>
+      </div>
       
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="demo-stack">
+        <div className="field">
+          <label>
             Test Text:
           </label>
           <input
             type="text"
             value={demoText}
             onChange={(e) => setDemoText(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-input"
             placeholder="Enter text to test..."
           />
         </div>
@@ -76,16 +79,16 @@ export default function ApiDemo() {
         <button
           onClick={runDemo}
           disabled={isLoading}
-          className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+          className="primary-btn full-btn"
         >
           {isLoading ? 'Running Demo...' : '🚀 Run Demo'}
         </button>
 
         {classification && (
-          <div className="border rounded-lg p-4 bg-gray-50">
-            <h3 className="font-semibold mb-2">📊 Classification Result</h3>
-            <div className="text-sm space-y-1">
-              <div><strong>Route:</strong> <span className="px-2 py-1 bg-blue-100 rounded">{classification.route}</span></div>
+          <div className="result-card result-card-blue">
+            <h3>Classification Result</h3>
+            <div className="result-body">
+              <div><strong>Route:</strong> <span className="route-pill">{classification.route}</span></div>
               <div><strong>Categories:</strong> {classification.categories.map((c: any) => c.label).join(', ')}</div>
               <div><strong>State:</strong> {classification.state.label} ({(classification.state.score * 100).toFixed(1)}%)</div>
               <div><strong>Uncertain:</strong> {classification.uncertain ? 'Yes' : 'No'}</div>
@@ -94,12 +97,12 @@ export default function ApiDemo() {
         )}
 
         {reasoning && (
-          <div className="border rounded-lg p-4 bg-green-50">
-            <h3 className="font-semibold mb-2">🧠 Reasoning Result</h3>
-            <div className="text-sm space-y-2">
+          <div className="result-card result-card-green">
+            <h3>Reasoning Result</h3>
+            <div className="result-body">
               <div>
                 <strong>Subtasks:</strong>
-                <ul className="list-disc list-inside ml-2">
+                <ul className="bulleted-list">
                   {reasoning.subtasks.map((task: string, i: number) => (
                     <li key={i}>{task}</li>
                   ))}
@@ -111,7 +114,7 @@ export default function ApiDemo() {
               <div>
                 <strong>Next Step:</strong> {reasoning.next_step.template}
                 {reasoning.next_step.slots && (
-                  <span className="ml-2 text-gray-600">
+                  <span className="slot-text">
                     ({Object.entries(reasoning.next_step.slots).map(([k, v]) => `${k}: ${v}`).join(', ')})
                   </span>
                 )}
@@ -121,14 +124,14 @@ export default function ApiDemo() {
         )}
 
         {classification && (
-          <div className="border rounded-lg p-4 bg-yellow-50">
-            <h3 className="font-semibold mb-2">🔄 Test Online Learning</h3>
-            <p className="text-sm text-gray-600 mb-2">
+          <div className="result-card result-card-amber">
+            <h3>Test Online Learning</h3>
+            <p className="result-body">
               Test the correction endpoint to see online learning in action.
             </p>
             <button
               onClick={testCorrection}
-              className="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
+              className="pill-btn"
             >
               Send Test Correction
             </button>
@@ -136,9 +139,9 @@ export default function ApiDemo() {
         )}
       </div>
 
-      <div className="mt-6 text-xs text-gray-500">
+      <div className="demo-tip">
         <p>💡 Try these examples:</p>
-        <ul className="list-disc list-inside ml-4 space-y-1">
+        <ul className="bulleted-list">
           <li>"shin splints after 2mi run" → Should trigger suggest_plan</li>
           <li>"need to send important email" → Should trigger Admin email rules</li>
           <li>"want to learn guitar" → Should trigger generic start state</li>
