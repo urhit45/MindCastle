@@ -1,6 +1,9 @@
 """
-TinyNet API Main Application
+TinyNet API — main application factory.
+Middleware order (outermost → innermost):
+  RequestID → BodySizeLimit → RateLimit → CORS → routers
 """
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +15,14 @@ from .config import settings
 from .routers import classify, nodes, home
 from .models import User
 from .ml.model_service import model_service
+from .errors import register_exception_handlers
+from .middleware import RequestIDMiddleware, BodySizeLimitMiddleware, RateLimitMiddleware
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+log = logging.getLogger(__name__)
 
 app = FastAPI(
     title=settings.app_name,
@@ -20,25 +31,35 @@ app = FastAPI(
     debug=settings.debug,
 )
 
+# ─── Exception handlers ───────────────────────────────────────────────────────
+# Must be registered before middleware so the handlers fire within the ASGI stack.
+register_exception_handlers(app)
+
+# ─── Middleware (added in reverse order — last added = outermost) ─────────────
+# Innermost: RateLimit (after CORS, before handler)
+app.add_middleware(RateLimitMiddleware)
+# Body size guard
+app.add_middleware(BodySizeLimitMiddleware)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-    ],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Outermost: RequestID (generates ID before anything else runs)
+app.add_middleware(RequestIDMiddleware)
 
+# ─── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(classify.router, tags=["classify"])
 app.include_router(nodes.router, tags=["nodes"])
 app.include_router(home.router, tags=["home"])
 
 
-async def _ensure_default_user():
-    """Create user id=1 (local@mindcastle) if it doesn't exist yet."""
+# ─── Startup / shutdown ───────────────────────────────────────────────────────
+
+async def _ensure_default_user() -> None:
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(User).where(User.id == 1))
         if not result.scalar_one_or_none():
@@ -47,16 +68,20 @@ async def _ensure_default_user():
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     await init_db()
     await _ensure_default_user()
-    model_service.load()  # train-on-first-run or load from models/best.pt
+    model_service.load()
+    log.info("startup_complete service=%s", settings.app_name)
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+async def shutdown_event() -> None:
     await close_db()
+    log.info("shutdown_complete")
 
+
+# ─── Core routes ──────────────────────────────────────────────────────────────
 
 @app.get("/healthz")
 async def health_check():

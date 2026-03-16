@@ -10,8 +10,17 @@ help:  ## Show this help message
 install:  ## Install Python dependencies
 	python3 -m pip install -r requirements.txt
 
-test:  ## Run tests
+test:  ## Run all tests
 	python3 -m pytest tests/ -v
+
+test-unit:  ## Run unit tests only
+	python3 -m pytest -m unit -v
+
+test-integration:  ## Run integration tests only
+	python3 -m pytest -m integration -v
+
+test-load:  ## Run load/perf tests only (p95 SLO gate)
+	python3 -m pytest -m load -v
 
 api:  ## Start the API server
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

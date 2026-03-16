@@ -6,6 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
+pytestmark = pytest.mark.integration
+
 client = TestClient(app)
 
 
@@ -207,13 +209,15 @@ class TestAPIContract:
         assert isinstance(data["related"], list)
     
     def test_node_details_invalid_uuid(self):
-        """Test node details with invalid UUID"""
+        """Test node details with invalid UUID returns uniform error envelope."""
         response = client.get("/nodes/invalid-uuid")
         assert response.status_code == 400
-        
+
         data = response.json()
-        assert "detail" in data
-        assert "Invalid node ID format" in data["detail"]
+        # Phase II: uniform error envelope — no raw "detail" key
+        assert "error" in data
+        assert "Invalid node ID format" in data["error"]["message"]
+        assert "requestId" in data["error"]
     
     def test_node_logs(self):
         """Test GET /nodes/{id}/logs endpoint"""

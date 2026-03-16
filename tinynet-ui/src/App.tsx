@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "./api";
 import { Onboarding } from "./Onboarding";
+import { ThemeProvider, useTheme } from "./theme/ThemeProvider";
+import { CastleViewport } from "./components/CastleViewport";
+import type { ThemeName } from "./theme/tokens";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -139,7 +142,7 @@ function Tag({ label }: { label: string }) {
   );
 }
 
-function IconBtn({ onClick, children, title }: { onClick: () => void; children: React.ReactNode; title?: string }) {
+function IconBtn({ onClick, children, title }: { onClick: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode; title?: string }) {
   return (
     <button title={title} onClick={onClick} style={{
       background: "none", border: "none", color: "#444", cursor: "pointer",
@@ -855,30 +858,37 @@ function EngineView({ engine, onUpdateEngine, onDeleteEngine }: {
   );
 }
 
-// ─── EMPTY STATE ─────────────────────────────────────────────────────────────
+// ─── THEME SWITCHER ───────────────────────────────────────────────────────────
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+const THEME_LABELS: { name: ThemeName; label: string }[] = [
+  { name: "tsushima",     label: "Tsushima" },
+  { name: "transylvania", label: "Transylvania" },
+  { name: "frieren",      label: "Frieren" },
+  { name: "lofi",         label: "Lofi" },
+];
+
+function ThemeSwitcher() {
+  const { themeName, setTheme } = useTheme();
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", textAlign: "center" }}>
-      <div style={{ fontSize: 48, marginBottom: 20, opacity: 0.2 }}>⬡</div>
-      <div style={{ fontSize: 22, fontFamily: "'Syne', sans-serif", fontWeight: 700, color: "#f0ece4", marginBottom: 8 }}>
-        Your castle is empty
-      </div>
-      <div style={{ fontSize: 12, color: "#444", marginBottom: 32, maxWidth: 360, lineHeight: 1.7 }}>
-        Engines are the domains of your life — Tech, Writing, Health, Finance, whatever you're building. Start with one.
-      </div>
-      <button onClick={onAdd} style={{
-        background: "#c8a96e18", border: "1px solid #c8a96e55", color: "#c8a96e",
-        borderRadius: 3, padding: "10px 24px", cursor: "pointer",
-        fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase",
-      }}>+ Add Your First Engine</button>
+    <div className="theme-switcher">
+      {THEME_LABELS.map(t => (
+        <button
+          key={t.name}
+          className={`theme-btn${themeName === t.name ? " active" : ""}`}
+          onClick={() => setTheme(t.name)}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// ─── MAIN APP (inner) ─────────────────────────────────────────────────────────
 
-export default function MindCastle() {
+function MindCastleInner() {
+  const { theme } = useTheme();
+
   const [engines, setEngines] = useState<Engine[]>(() => load());
   const [activeEngineId, setActiveEngineId] = useState<string | null>(() => {
     const saved = load();
@@ -887,10 +897,8 @@ export default function MindCastle() {
   const [addingEngine, setAddingEngine] = useState(false);
   const prevEngineCount = useRef(engines.length);
 
-  // Persist on every change
   useEffect(() => { save(engines); }, [engines]);
 
-  // Auto-select new engine when added
   useEffect(() => {
     if (engines.length > prevEngineCount.current) {
       setActiveEngineId(engines[engines.length - 1].id);
@@ -912,16 +920,11 @@ export default function MindCastle() {
   const totalArtifacts = engines.reduce((n, e) => n + e.artifacts.length, 0);
 
   return (
-    <div style={{ background: "#080808", minHeight: "100vh", color: "#f0ece4", fontFamily: "'DM Mono', monospace" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
-        input, textarea, button { font-family: inherit; }
-      `}</style>
-
+    <div style={{
+      display: "flex", flexDirection: "column", height: "100dvh",
+      background: "var(--bg-app)", color: "var(--text-primary)",
+      fontFamily: "'DM Mono', monospace", overflow: "hidden",
+    }}>
       {addingEngine && (
         <EngineEditor
           engine={EMPTY_ENGINE()}
@@ -933,15 +936,17 @@ export default function MindCastle() {
       )}
 
       {/* Top nav */}
-      <div style={{
-        display: "flex", alignItems: "center",
-        borderBottom: "1px solid #151515", padding: "0 32px",
-        background: "#080808", position: "sticky", top: 0, zIndex: 50,
+      <nav style={{
+        display: "flex", alignItems: "center", flexShrink: 0,
+        borderBottom: `1px solid ${theme.borderMuted}`,
+        padding: "0 clamp(16px, 3vw, 32px)",
+        background: "var(--bg-nav)",
+        position: "sticky", top: 0, zIndex: 50,
         overflowX: "auto",
       }}>
         <div style={{
           fontSize: 11, fontFamily: "'Syne', sans-serif", fontWeight: 700,
-          letterSpacing: "0.2em", color: "#2a2a2a", textTransform: "uppercase",
+          letterSpacing: "0.2em", color: "var(--text-ghost)", textTransform: "uppercase",
           padding: "18px 0", marginRight: 32, whiteSpace: "nowrap", flexShrink: 0,
         }}>
           MIND · CASTLE
@@ -951,19 +956,20 @@ export default function MindCastle() {
           <button key={e.id} onClick={() => setActiveEngineId(e.id)} style={{
             background: "none", border: "none",
             borderBottom: activeEngineId === e.id ? `2px solid ${e.color}` : "2px solid transparent",
-            color: activeEngineId === e.id ? e.color : "#444",
+            color: activeEngineId === e.id ? e.color : "var(--text-muted)",
             padding: "18px 18px 16px", cursor: "pointer",
             fontSize: 11, fontFamily: "'Syne', sans-serif", fontWeight: 700,
             letterSpacing: "0.1em", textTransform: "uppercase",
-            display: "flex", alignItems: "center", gap: 8, transition: "all 0.2s", whiteSpace: "nowrap",
+            display: "flex", alignItems: "center", gap: 8,
+            transition: `all var(--transition)`, whiteSpace: "nowrap",
           }}>
             <span style={{ opacity: 0.7 }}>{e.icon}</span>
             {e.name}
             <span style={{
               fontSize: 9,
-              background: activeEngineId === e.id ? e.color + "22" : "#151515",
+              background: activeEngineId === e.id ? e.color + "22" : theme.bgSubtle,
               padding: "1px 6px", borderRadius: 10,
-              color: activeEngineId === e.id ? e.color : "#333",
+              color: activeEngineId === e.id ? e.color : "var(--text-ghost)",
             }}>
               {e.artifacts.length}
             </span>
@@ -972,19 +978,21 @@ export default function MindCastle() {
 
         <button onClick={() => setAddingEngine(true)} style={{
           background: "none", border: "none", borderBottom: "2px solid transparent",
-          color: "#2a2a2a", padding: "18px 14px 16px", cursor: "pointer",
+          color: "var(--text-ghost)", padding: "18px 14px 16px", cursor: "pointer",
           fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
-          whiteSpace: "nowrap", flexShrink: 0, transition: "color 0.2s",
+          whiteSpace: "nowrap", flexShrink: 0, transition: `color var(--transition)`,
         }}
-          onMouseEnter={e => (e.currentTarget.style.color = "#666")}
-          onMouseLeave={e => (e.currentTarget.style.color = "#2a2a2a")}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--text-secondary)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "var(--text-ghost)")}
         >
           + Engine
         </button>
-      </div>
 
-      {/* Content */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px 80px" }}>
+        <ThemeSwitcher />
+      </nav>
+
+      {/* Content — CastleViewport handles centering + scroll */}
+      <CastleViewport>
         {activeEngine
           ? <EngineView
               key={activeEngine.id}
@@ -997,15 +1005,30 @@ export default function MindCastle() {
               onSkip={() => setAddingEngine(true)}
             />
         }
-      </div>
+      </CastleViewport>
 
       {/* Footer */}
-      <div style={{ borderTop: "1px solid #0e0e0e", padding: "14px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 10, color: "#1e1e1e", letterSpacing: "0.1em" }}>MIND CASTLE</span>
-        <span style={{ fontSize: 10, color: "#1e1e1e" }}>
+      <footer style={{
+        borderTop: `1px solid ${theme.borderMuted}`,
+        padding: "12px clamp(16px, 3vw, 32px)",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 10, color: "var(--text-ghost)", letterSpacing: "0.1em" }}>MIND CASTLE</span>
+        <span style={{ fontSize: 10, color: "var(--text-ghost)" }}>
           {engines.length} engine{engines.length !== 1 ? "s" : ""} · {totalArtifacts} artifact{totalArtifacts !== 1 ? "s" : ""}
         </span>
-      </div>
+      </footer>
     </div>
+  );
+}
+
+// ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
+
+export default function MindCastle() {
+  return (
+    <ThemeProvider>
+      <MindCastleInner />
+    </ThemeProvider>
   );
 }

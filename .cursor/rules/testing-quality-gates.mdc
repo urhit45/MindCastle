@@ -1,0 +1,14 @@
+---
+description: Mandatory test coverage and quality gates for all meaningful changes
+alwaysApply: true
+---
+
+# Testing and Quality Gates
+
+- Every meaningful change must include unit tests, integration tests, and load/performance coverage.
+- If one test layer cannot be added immediately, require explicit justification plus a tracked TODO.
+- Add regression tests for bugs before/with the fix.
+- For UI changes, test critical flows and visual/layout invariants (especially Castle centering and safe areas).
+- For backend/model changes, include failure-mode and edge-case coverage.
+- Do not consider work complete unless tests pass for affected behavior.
+- Prefer deterministic tests and stable fixtures over brittle timing-dependent tests.

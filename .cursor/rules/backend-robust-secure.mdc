@@ -1,0 +1,15 @@
+---
+description: Backend robustness and security standards
+globs: tinynet-api/**/*.py
+alwaysApply: false
+---
+
+# Backend Robust + Secure
+
+- Validate all external input strictly (schema validation, type checks, bounds checks).
+- Fail safely: return controlled errors, never leak internals, secrets, stack traces, or raw exceptions.
+- Enforce authN/authZ checks at API boundaries and sensitive operations.
+- Use secure defaults: least privilege, explicit allowlists, timeouts, retries with backoff, idempotency where needed.
+- Sanitize and structure logs; never log credentials, tokens, or sensitive payloads.
+- Handle concurrency and race conditions deliberately (transaction boundaries, locks, atomic updates).
+- Add tests for security-critical paths (invalid input, privilege misuse, abuse cases).
