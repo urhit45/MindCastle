@@ -44,6 +44,7 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
+    allow_origin_regex=r"http://192\.168\.\d+\.\d+:5173",  # LAN phones/tablets
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

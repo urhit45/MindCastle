@@ -1,4 +1,5 @@
-const BASE = "http://localhost:8000";
+// Use the same host the browser loaded from so phones on LAN hit the right IP
+const BASE = `http://${window.location.hostname}:8000`;
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
