@@ -27,6 +27,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:3000",
     ],
+    allow_origin_regex=r"http://192\.168\.\d+\.\d+:5173",  # LAN phones/tablets
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
