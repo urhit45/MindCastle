@@ -1,0 +1,14 @@
+---
+description: Core product and architecture principles for MindCastle
+alwaysApply: true
+---
+
+# MindCastle Core Rules
+
+- Preserve a calm, low-cognitive-load product direction in all decisions.
+- Keep architecture future-proof: modular boundaries, typed interfaces, config-driven behavior.
+- Avoid hardcoded product assumptions that block premium upgrades or customization.
+- Theme customization is mandatory by default; no feature should assume a single theme.
+- App should use full available screen space while respecting safe areas.
+- The Castle is the visual anchor and must remain centered in the usable viewport.
+- Prefer extensible abstractions over one-off implementations.

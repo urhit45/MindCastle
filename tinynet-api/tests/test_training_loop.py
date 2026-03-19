@@ -12,6 +12,8 @@ from pathlib import Path
 import numpy as np
 from unittest.mock import patch, MagicMock
 
+pytestmark = pytest.mark.unit
+
 from app.ml.tinynet import TinyNet
 from app.ml.train_utils import (
     TinyNetDataset, load_labels_config, load_training_data,

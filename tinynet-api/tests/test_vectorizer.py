@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 from app.ml.vectorizer import HashingVectorizer512
 
+pytestmark = pytest.mark.unit
+
 
 class TestHashingVectorizer512:
     """Test suite for HashingVectorizer512"""

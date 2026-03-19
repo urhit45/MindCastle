@@ -6,6 +6,8 @@ import pytest
 from pathlib import Path
 from app.ml.bootstrap import BootstrapLabeller
 
+pytestmark = pytest.mark.unit
+
 
 class TestBootstrapLabeller:
     """Test suite for BootstrapLabeller"""

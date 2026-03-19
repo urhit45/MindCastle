@@ -1,0 +1,14 @@
+---
+description: Model safety, fairness, drift detection, and quality metrics requirements
+alwaysApply: true
+---
+
+# Model Governance Rules
+
+- Prioritize safety over confidence: support abstain/defer paths for low-certainty predictions.
+- Include bias checks across relevant cohorts; document fairness metrics and known limitations.
+- Add deviation detection: data drift, concept drift, and prediction distribution shift monitoring.
+- Track quality metrics continuously (accuracy/F1 where relevant, calibration, false-positive/false-negative tradeoffs, latency).
+- Version datasets, model artifacts, prompts/configs, and evaluation baselines for reproducibility.
+- Never train/evaluate on leaked targets, contaminated splits, or untraceable data sources.
+- Log model decisions in a privacy-safe way for auditability and incident review.

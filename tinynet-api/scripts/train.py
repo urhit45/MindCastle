@@ -6,14 +6,13 @@ Trains the TinyNet model on JSONL data and saves checkpoints + ONNX export.
 
 import argparse
 import sys
-import os
+import time
 from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import numpy as np
-import json
 import logging
 
 # Add the project root to Python path so we can import app modules
@@ -24,8 +23,11 @@ from app.ml.tinynet import TinyNet
 from app.ml.train_utils import (
     TinyNetDataset, load_labels_config, load_training_data,
     create_label_mappings, compute_class_weights, split_data,
-    compute_metrics, save_checkpoint, export_onnx, setup_logging
+    compute_metrics, aggregate_epoch_predictions, save_checkpoint,
+    export_onnx, setup_logging,
 )
+from app.ml.fairness import compute_group_metrics, parity_check, generate_fairness_report
+from app.ml.audit import write_run_manifest, write_model_card
 
 
 def train_epoch(model: TinyNet, train_loader: DataLoader, optimizer: optim.Optimizer, 
@@ -65,32 +67,30 @@ def train_epoch(model: TinyNet, train_loader: DataLoader, optimizer: optim.Optim
             cat_logits, state_logits, nextstep_logits,
             cat_target, state_target, nextstep_target
         )
-        
-        total_loss = losses['total']
-        
-        # Backward pass
-        total_loss.backward()
+
+        # Accumulate epoch loss (was: total_loss = losses['total'] — overwrote each step)
+        batch_loss = losses['total']
+        batch_loss.backward()
         optimizer.step()
-        
-        # Store predictions and targets for metrics
+        total_loss += batch_loss.item()
+
+        # Store predictions and targets for epoch-level metrics
         with torch.no_grad():
             predictions = model.predict(x)
             all_predictions.append(predictions)
             all_targets.append({
                 'cat_target': cat_target,
                 'state_target': state_target,
-                'nextstep_target': nextstep_target
             })
-        
+
         if batch_idx % 10 == 0:
-            logging.info(f"Batch {batch_idx}/{len(train_loader)}, Loss: {total_loss.item():.4f}")
-    
-    # Compute training metrics
-    train_metrics = compute_metrics(
-        all_predictions[-1], all_targets[-1], category_to_idx, state_to_idx
-    )
-    train_metrics['train_loss'] = total_loss.item()
-    
+            logging.info(f"Batch {batch_idx}/{len(train_loader)}, Loss: {batch_loss.item():.4f}")
+
+    # Aggregate across all batches (was: only last batch)
+    agg_preds, agg_tgts = aggregate_epoch_predictions(all_predictions, all_targets)
+    train_metrics = compute_metrics(agg_preds, agg_tgts, category_to_idx, state_to_idx)
+    train_metrics['train_loss'] = total_loss / max(len(train_loader), 1)
+
     return train_metrics
 
 
@@ -133,20 +133,18 @@ def validate_epoch(model: TinyNet, val_loader: DataLoader, device: torch.device,
             
             total_loss += losses['total'].item()
             
-            # Store predictions and targets for metrics
+            # Store predictions and targets for epoch-level metrics
             predictions = model.predict(x)
             all_predictions.append(predictions)
             all_targets.append({
                 'cat_target': cat_target,
                 'state_target': state_target,
-                'nextstep_target': nextstep_target
             })
-    
-    # Compute validation metrics
-    val_metrics = compute_metrics(
-        all_predictions[-1], all_targets[-1], category_to_idx, state_to_idx
-    )
-    val_metrics['val_loss'] = total_loss / len(val_loader)
+
+    # Aggregate across all batches (was: only last batch)
+    agg_preds, agg_tgts = aggregate_epoch_predictions(all_predictions, all_targets)
+    val_metrics = compute_metrics(agg_preds, agg_tgts, category_to_idx, state_to_idx)
+    val_metrics['val_loss'] = total_loss / max(len(val_loader), 1)
     
     return val_metrics
 
@@ -357,12 +355,70 @@ def main():
     # Export ONNX model
     logging.info("Exporting ONNX model...")
     export_onnx(model, output_dir)
-    
+
+    # ── Phase III: fairness + audit artifacts ──────────────────────────────
+    run_id = f"run_{int(time.time())}_seed{args.seed}"
+
+    # Fairness: run full-val inference, compute per-group metrics
+    logging.info("Running fairness evaluation on validation set...")
+    model.eval()
+    all_val_preds: list = []
+    all_val_tgts:  list = []
+    with torch.no_grad():
+        for batch in val_loader:
+            xb = batch['x'].to(device)
+            all_val_preds.append(model.predict(xb))
+            all_val_tgts.append({
+                'cat_target':   batch['cat_target'],
+                'state_target': batch['state_target'].squeeze(1),
+            })
+
+    agg_vp, agg_vt = aggregate_epoch_predictions(all_val_preds, all_val_tgts)
+    state_preds_np  = agg_vp['state']['predictions'].cpu().numpy()
+    cat_preds_np    = agg_vp['categories']['predictions'].cpu().numpy()
+    state_tgts_np   = agg_vt['state_target'].cpu().numpy()
+    cat_tgts_np     = agg_vt['cat_target'].cpu().numpy()
+    # Use 'group' field if present, else 'default' for all samples
+    groups = [item.get('group', 'default') for item in val_data]
+
+    group_metrics = compute_group_metrics(
+        state_preds_np, state_tgts_np, cat_preds_np, cat_tgts_np, groups,
+    )
+    parity = parity_check(group_metrics)
+    fairness_report = generate_fairness_report(
+        group_metrics, parity, run_id,
+        output_path=output_dir / "fairness_report.json",
+    )
+    if not fairness_report["overall_pass"]:
+        logging.warning("FAIRNESS ALERT: parity check failed — %s", parity)
+    else:
+        logging.info("Fairness check passed.")
+
+    # Run manifest
+    labels_path = Path(args.config)
+    if not labels_path.is_absolute():
+        labels_path = project_root / labels_path
+    write_run_manifest(
+        run_id=run_id,
+        data_path=Path(args.data),
+        labels_path=labels_path,
+        model_version="0.1.0",
+        seed=args.seed,
+        thresholds={"abstain_state": 0.35, "abstain_cat": 0.25, "defer_state": 0.50},
+        metrics={"best_val_score": best_score, **val_metrics},
+        output_path=output_dir / "run_manifest.json",
+    )
+
+    # Model card (idempotent)
+    write_model_card(output_dir / "model_card.json")
+
     # Final summary
     logging.info("Training completed!")
     logging.info(f"Best validation score: {best_score:.4f}")
     logging.info(f"Checkpoints saved to: {output_dir}")
     logging.info(f"ONNX model saved to: {output_dir / 'tinynet.onnx'}")
+    logging.info(f"Run manifest: {output_dir / 'run_manifest.json'}")
+    logging.info(f"Fairness report: {output_dir / 'fairness_report.json'}")
 
 
 if __name__ == "__main__":

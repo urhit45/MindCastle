@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Frontend ──────────────────────────────────────────────────────────────
+  ui-checks:
+    name: "UI: Lint + Typecheck + Tests"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tinynet-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tinynet-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit / component tests
+        run: npm run test:run
+
+  # ── Backend unit ──────────────────────────────────────────────────────────
+  api-unit:
+    name: "API: Unit Tests"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tinynet-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: tinynet-api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python3 -m pytest -m unit
+
+  # ── Backend integration ───────────────────────────────────────────────────
+  api-integration:
+    name: "API: Integration Tests"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tinynet-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: tinynet-api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Integration tests
+        run: python3 -m pytest -m integration
+
+  # ── Backend load / perf ───────────────────────────────────────────────────
+  api-load:
+    name: "API: Load / Perf Tests"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tinynet-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: tinynet-api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Load / perf tests (p95 SLO gate)
+        run: python3 -m pytest -m load
+
+  # ── Merge gate ────────────────────────────────────────────────────────────
+  gate:
+    name: "Gate — all checks must pass"
+    needs: [ui-checks, api-unit, api-integration, api-load]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Fail if any job failed
+        run: |
+          if [[ "${{ needs.ui-checks.result }}" != "success" ||
+                "${{ needs.api-unit.result }}" != "success" ||
+                "${{ needs.api-integration.result }}" != "success" ||
+                "${{ needs.api-load.result }}" != "success" ]]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All CI jobs passed."

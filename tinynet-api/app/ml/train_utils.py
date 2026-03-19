@@ -264,7 +264,43 @@ def compute_metrics(predictions: Dict[str, Any], targets: Dict[str, torch.Tensor
     return metrics
 
 
-def save_checkpoint(model: TinyNet, optimizer: torch.optim.Optimizer, epoch: int, 
+def aggregate_epoch_predictions(
+    all_predictions: List[Dict[str, Any]],
+    all_targets:     List[Dict[str, torch.Tensor]],
+) -> Tuple[Dict[str, Any], Dict[str, torch.Tensor]]:
+    """
+    Concatenate per-batch model.predict() outputs and targets into full-epoch tensors.
+
+    Fixes the last-batch-only metrics bug in train_epoch / validate_epoch:
+    instead of compute_metrics(all_predictions[-1], all_targets[-1]),
+    callers should do:
+        agg_preds, agg_tgts = aggregate_epoch_predictions(all_predictions, all_targets)
+        metrics = compute_metrics(agg_preds, agg_tgts, ...)
+
+    Args:
+        all_predictions: list of dicts returned by model.predict(batch)
+        all_targets:     list of {cat_target, state_target} dicts per batch
+
+    Returns:
+        (predictions_dict, targets_dict) with full-epoch tensors
+    """
+    cat_preds   = torch.cat([p["categories"]["predictions"] for p in all_predictions], dim=0)
+    state_preds = torch.cat([p["state"]["predictions"]      for p in all_predictions], dim=0)
+    cat_tgts    = torch.cat([t["cat_target"]                for t in all_targets],     dim=0)
+    state_tgts  = torch.cat([t["state_target"]              for t in all_targets],     dim=0)
+
+    agg_preds = {
+        "categories": {"predictions": cat_preds},
+        "state":      {"predictions": state_preds},
+    }
+    agg_tgts = {
+        "cat_target":   cat_tgts,
+        "state_target": state_tgts,
+    }
+    return agg_preds, agg_tgts
+
+
+def save_checkpoint(model: TinyNet, optimizer: torch.optim.Optimizer, epoch: int,
                    metrics: Dict[str, float], save_path: Path, is_best: bool = False):
     """
     Save model checkpoint.

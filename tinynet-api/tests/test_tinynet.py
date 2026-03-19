@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 from app.ml.tinynet import TinyNet
 
+pytestmark = pytest.mark.unit
+
 
 class TestTinyNet:
     """Test suite for TinyNet PyTorch model"""
