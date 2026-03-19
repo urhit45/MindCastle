@@ -38,6 +38,38 @@ export interface ClassifyResponse {
   route: 'needs_confirm' | 'suggest_plan' | 'auto_save_ok';
 }
 
+export interface ReviewItem {
+  id: string;
+  type: 'progress_log' | 'todo';
+  reason: 'blocked' | 'next_step' | 'stale' | 'overdue' | 'due_soon';
+  title: string;
+  nodeId?: string | null;
+  created_at?: string;
+  due_at?: string;
+  state?: string;
+  next_step?: string | null;
+  priority?: 'high' | 'medium' | 'low';
+}
+
+export interface ReviewStats {
+  total_items: number;
+  blocked_count: number;
+  next_step_count: number;
+  stale_count: number;
+  overdue_count: number;
+  due_soon_count: number;
+  high_priority: number;
+  medium_priority: number;
+  low_priority: number;
+}
+
+export interface ReviewResponse {
+  ok: boolean;
+  items: ReviewItem[];
+  stats: ReviewStats;
+  generated_at: string;
+}
+
 /**
  * Reason about a text input and get structured planning suggestions
  */
@@ -69,6 +101,19 @@ export async function classifyText(text: string, contextNodeId?: string): Promis
     throw new Error(`Classification failed: ${r.status} ${r.statusText}`);
   }
   
+  return await r.json();
+}
+
+/**
+ * Get home review items used for the "One Next Task" experience.
+ */
+export async function getHomeReview(limit = 25): Promise<ReviewResponse> {
+  const r = await fetch(`http://localhost:8002/home/review?limit=${limit}`);
+
+  if (!r.ok) {
+    throw new Error(`Home review failed: ${r.status} ${r.statusText}`);
+  }
+
   return await r.json();
 }
 

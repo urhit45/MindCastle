@@ -6,12 +6,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
 from datetime import datetime, timedelta
-from typing import List, Optional
 import logging
 
 from ..db import get_session
 from ..models import ProgressLog, Todo, Node
-from ..schemas import ProgressLog, Todo, Node
 
 router = APIRouter(prefix="/home", tags=["home"])
 
