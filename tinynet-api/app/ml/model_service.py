@@ -32,6 +32,16 @@ TRAIN_DATA_PATH = Path(__file__).parent.parent.parent / "data" / "train.jsonl"
 MODEL_DIR       = Path(__file__).parent.parent.parent / "models"
 MODEL_PATH      = MODEL_DIR / "best.pt"
 
+_PROJECT_KEYWORDS = (
+    "phase", "milestone", "sprint", "roadmap", "build", "develop", "implementation",
+    "feature", "bug", "fix", "frontend", "backend", "api", "ui", "ux", "code",
+    "repo", "github", "deploy", "release", "onboarding", "dashboard", "migration",
+)
+
+_AI_KEYWORDS = (
+    "ai", "ml", "model", "classifier", "nemotron", "tinynet", "llm",
+)
+
 
 # ─── Latency tracker ─────────────────────────────────────────────────────────
 
@@ -171,6 +181,35 @@ class ModelService:
 
         self.model.eval()
 
+    def _apply_category_overrides(
+        self,
+        text: str,
+        categories: List[Dict[str, float]],
+    ) -> List[Dict[str, float]]:
+        """
+        Guardrail for obvious product/dev notes that TinyNet can misread as hobbies.
+        """
+        lowered = text.lower()
+        if not any(keyword in lowered for keyword in _PROJECT_KEYWORDS):
+            return categories
+
+        merged = [dict(entry) for entry in categories]
+
+        def _upsert(label: str, min_score: float) -> None:
+            for entry in merged:
+                if entry["label"] == label:
+                    entry["score"] = round(max(float(entry["score"]), min_score), 3)
+                    return
+            merged.append({"label": label, "score": round(min_score, 3)})
+
+        _upsert("SideProject", 0.92)
+        _upsert("Work", 0.86)
+
+        if any(keyword in lowered for keyword in _AI_KEYWORDS):
+            _upsert("AI", 0.88)
+
+        return sorted(merged, key=lambda e: e["score"], reverse=True)[:5]
+
     def classify(self, text: str) -> Dict[str, Any]:
         """
         Run text through TinyNet + safety policy + drift monitor.
@@ -205,6 +244,7 @@ class ModelService:
         if not categories:
             best = int(np.argmax(cat_probs))
             categories = [{"label": self.categories[best], "score": round(cat_probs[best], 3)}]
+        categories = self._apply_category_overrides(text, categories)
 
         best_state_idx = int(np.argmax(state_probs))
         state = {

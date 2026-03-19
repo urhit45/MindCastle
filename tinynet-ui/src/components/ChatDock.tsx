@@ -235,15 +235,15 @@ export default function ChatDock() {
       {/* Header */}
       <div className="panel-header">
         <h2>TinyNet Chat</h2>
-        <p>Party guide for your focus quests</p>
+        <p>Capture thoughts, classify state, and get your next step.</p>
       </div>
 
       {/* Messages */}
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="chat-empty">
-            <p>Start a conversation to see how TinyNet can help!</p>
-            <p>Try: "shin splints after 2mi run"</p>
+            <p>Start with one sentence. TinyNet will classify and suggest what to do next.</p>
+            <p>Example: "shin splints after 2mi run"</p>
           </div>
         )}
         

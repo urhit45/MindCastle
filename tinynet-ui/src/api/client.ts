@@ -3,6 +3,10 @@
  * Handles communication with the backend reasoning and classification endpoints
  */
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE ??
+  `http://${typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'}:8000`;
+
 export interface ReasonRequest {
   text: string;
   pred: {
@@ -38,6 +42,12 @@ export interface ClassifyResponse {
   route: 'needs_confirm' | 'suggest_plan' | 'auto_save_ok';
 }
 
+type RawClassifyResponse = Partial<ClassifyResponse> & {
+  decisionMode?: string;
+  next_step?: { template?: string; slots?: Record<string, any>; confidence?: number };
+  nextStep?: { template?: string; slots?: Record<string, any>; confidence?: number };
+};
+
 export interface ReviewItem {
   id: string;
   type: 'progress_log' | 'todo';
@@ -70,11 +80,37 @@ export interface ReviewResponse {
   generated_at: string;
 }
 
+export type GraphSignal = 'temporal_co_activation' | 'blocked_propagation' | 'progress_correlation';
+
+export interface MindMapNode {
+  id: string;
+  name: string;
+  val: number;
+  color: string;
+  icon: string;
+  status: string;
+}
+
+export interface MindMapLink {
+  source: string;
+  target: string;
+  weight: number;
+  width: number;
+  dominant_signal: GraphSignal;
+  signal_breakdown: Partial<Record<GraphSignal, number>>;
+}
+
+export interface MindMapResponse {
+  ok: boolean;
+  nodes: MindMapNode[];
+  links: MindMapLink[];
+}
+
 /**
  * Reason about a text input and get structured planning suggestions
  */
 export async function reasonAbout(payload: ReasonRequest): Promise<ReasonResponse> {
-  const r = await fetch("http://localhost:8002/reason/", {
+  const r = await fetch(`${API_BASE}/reason/`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(payload)
@@ -91,7 +127,7 @@ export async function reasonAbout(payload: ReasonRequest): Promise<ReasonRespons
  * Classify text and get routing guidance
  */
 export async function classifyText(text: string, contextNodeId?: string): Promise<ClassifyResponse> {
-  const r = await fetch("http://localhost:8002/classify/", {
+  const r = await fetch(`${API_BASE}/classify/`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ text, contextNodeId })
@@ -100,20 +136,59 @@ export async function classifyText(text: string, contextNodeId?: string): Promis
   if (!r.ok) {
     throw new Error(`Classification failed: ${r.status} ${r.statusText}`);
   }
-  
-  return await r.json();
+
+  const raw = (await r.json()) as RawClassifyResponse;
+
+  const categories = raw.categories ?? [];
+  const state = raw.state ?? { label: 'continue', score: 0.5 };
+  const nextStep = raw.nextStep ?? raw.next_step ?? {
+    template: 'OutlineThreeBullets',
+    confidence: 0.5,
+  };
+  const uncertain = Boolean(raw.uncertain);
+  const decisionMode = raw.decisionMode ?? 'normal';
+
+  let route: ClassifyResponse['route'] = 'auto_save_ok';
+  if (uncertain || ['cautious', 'review', 'fallback'].includes(decisionMode)) {
+    route = 'needs_confirm';
+  } else if (
+    ['blocked', 'start', 'idea', 'planned', 'planning', 'pause'].includes((state.label ?? '').toLowerCase())
+  ) {
+    route = 'suggest_plan';
+  }
+
+  return {
+    categories,
+    state,
+    linkHints: raw.linkHints ?? [],
+    nextStep: {
+      template: nextStep.template ?? 'OutlineThreeBullets',
+      slots: nextStep.slots ?? {},
+      confidence: nextStep.confidence ?? 0.5,
+    },
+    uncertain,
+    route,
+  };
 }
 
 /**
  * Get home review items used for the "One Next Task" experience.
  */
 export async function getHomeReview(limit = 25): Promise<ReviewResponse> {
-  const r = await fetch(`http://localhost:8002/home/review?limit=${limit}`);
+  const r = await fetch(`${API_BASE}/home/review?limit=${limit}`);
 
   if (!r.ok) {
     throw new Error(`Home review failed: ${r.status} ${r.statusText}`);
   }
 
+  return await r.json();
+}
+
+export async function getMindMap(minWeight = 0.05): Promise<MindMapResponse> {
+  const r = await fetch(`${API_BASE}/graph/mind-map?min_weight=${minWeight}`);
+  if (!r.ok) {
+    throw new Error(`Mind map fetch failed: ${r.status} ${r.statusText}`);
+  }
   return await r.json();
 }
 
@@ -127,7 +202,7 @@ export async function correctClassification(payload: {
   linkTo?: string | null;
   nextStepTemplate?: string | null;
 }): Promise<{ok: boolean}> {
-  const r = await fetch("http://localhost:8002/classify/correct", {
+  const r = await fetch(`${API_BASE}/classify/correct`, {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(payload)

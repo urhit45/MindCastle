@@ -2,7 +2,7 @@
 SQLAlchemy models for TinyNet
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, Index
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, Index, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .db import Base
@@ -88,7 +88,21 @@ class Todo(Base):
     user = relationship("User", back_populates="todos")
 
 
+class GraphEdge(Base):
+    """Learned graph relationship between two engines (node-level proxy for now)."""
+    __tablename__ = "graph_edges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_engine_id = Column(String(36), nullable=False, index=True)
+    target_engine_id = Column(String(36), nullable=False, index=True)
+    weight = Column(Float, nullable=False, default=0.0)
+    sample_count = Column(Integer, nullable=False, default=0)
+    signal_breakdown = Column(JSON, nullable=False, default=dict)
+    last_updated = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
 # Create indexes
 Index("idx_nodes_title", Node.title)
 Index("idx_progress_logs_node_created", ProgressLog.node_id, ProgressLog.created_at.desc())
 Index("idx_todos_status_due", Todo.status, Todo.due_at)
+Index("idx_graph_edges_pair", GraphEdge.source_engine_id, GraphEdge.target_engine_id, unique=True)

@@ -95,6 +95,8 @@ interface OneNextTaskViewProps {
   onCandidateChange?: (candidate: NextTaskCandidate) => void;
   transitionModeEnabled?: boolean;
   onTransitionModeEnabledChange?: (enabled: boolean) => void;
+  preferredNodeId?: string | null;
+  onClearPreferredNode?: () => void;
 }
 
 export default function OneNextTaskView({
@@ -103,6 +105,8 @@ export default function OneNextTaskView({
   onCandidateChange,
   transitionModeEnabled = true,
   onTransitionModeEnabledChange,
+  preferredNodeId,
+  onClearPreferredNode,
 }: OneNextTaskViewProps) {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [index, setIndex] = useState(0);
@@ -133,6 +137,14 @@ export default function OneNextTaskView({
 
   const candidates = useMemo(() => buildCandidates(items), [items]);
   const candidate = candidates[index % candidates.length];
+
+  React.useEffect(() => {
+    if (!preferredNodeId || candidates.length === 0) return;
+    const preferredIndex = candidates.findIndex((c) => c.source.nodeId === preferredNodeId);
+    if (preferredIndex >= 0 && preferredIndex !== index) {
+      setIndex(preferredIndex);
+    }
+  }, [preferredNodeId, candidates, index]);
 
   React.useEffect(() => {
     onCandidateChange?.(candidate);
@@ -171,6 +183,14 @@ export default function OneNextTaskView({
         <h3 className="next-task-title">{candidate.task}</h3>
         <p className="next-task-artifact">{candidate.artifact}</p>
         <p className="next-task-meta">{candidate.reasonLabel}</p>
+        {preferredNodeId && (
+          <p className="next-task-meta">
+            Navigating from mind map node.
+            <button type="button" className="next-task-clear" onClick={onClearPreferredNode}>
+              Clear
+            </button>
+          </p>
+        )}
 
         <div className="next-task-actions">
           <button

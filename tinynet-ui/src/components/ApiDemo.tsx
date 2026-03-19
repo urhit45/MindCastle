@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { classifyText, reasonAbout, correctClassification } from '../api/client';
 
 export default function ApiDemo() {
@@ -59,7 +59,7 @@ export default function ApiDemo() {
     <div className="panel demo-panel">
       <div className="panel-header">
         <h2>Scout Console</h2>
-        <p>Probe classify, reason, and live corrections</p>
+        <p>Model diagnostics for classify, reason, and corrections.</p>
       </div>
       
       <div className="demo-stack">

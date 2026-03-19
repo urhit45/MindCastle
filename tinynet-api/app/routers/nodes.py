@@ -1,64 +1,36 @@
 """
-Nodes router — real SQLite reads/writes via SQLAlchemy async.
-All writes are scoped to the requesting user via get_current_user().
+Nodes router — real SQLite reads/writes via SQLAlchemy async
 """
-import logging
-import uuid
-from typing import Annotated, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from typing import List, Optional
+from pydantic import BaseModel
+import uuid
 
 from ..db import get_session
-from ..dependencies import CurrentUser, get_current_user, get_request_id
 from ..models import Node, ProgressLog
-
-log = logging.getLogger(__name__)
+from ..services.graph_learning import update_graph_edges_for_log
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
-# ─── Shared type aliases ──────────────────────────────────────────────────────
+DEFAULT_USER_ID = 1  # single-user MVP; no auth layer yet
 
-ValidStatus = Literal[
-    "start", "continue", "pause", "end", "idea",
-    "active", "live", "concept", "blocked", "planned", "planning",
-]
 
-BoundedTitle = Annotated[str, Field(min_length=1, max_length=200)]
-BoundedText  = Annotated[str, Field(min_length=1, max_length=2000)]
-
-# ─── Request / Response models ────────────────────────────────────────────────
+# ─── Request / Response models ───────────────────────────────────────────────
 
 class NodeCreate(BaseModel):
-    title: BoundedTitle
+    title: str
     is_hub: bool = False
-    status: ValidStatus = "continue"
-
-    @field_validator("title")
-    @classmethod
-    def strip_title(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("title must not be blank")
-        return v
+    status: str = "continue"
 
 
 class NodeUpdate(BaseModel):
-    title: Optional[BoundedTitle] = None
+    title: Optional[str] = None
     is_hub: Optional[bool] = None
-    status: Optional[ValidStatus] = None
-
-    @field_validator("title")
-    @classmethod
-    def strip_title(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            v = v.strip()
-            if not v:
-                raise ValueError("title must not be blank")
-        return v
+    status: Optional[str] = None
 
 
 class NodeResponse(BaseModel):
@@ -100,9 +72,9 @@ class NodeDetailResponse(BaseModel):
 
 
 class NodeLogCreate(BaseModel):
-    text: BoundedText
-    state: ValidStatus = "continue"
-    next_step: Optional[Annotated[str, Field(max_length=500)]] = None
+    text: str
+    state: str = "continue"
+    next_step: Optional[str] = None
 
 
 class NodeLogItem(BaseModel):
@@ -117,7 +89,7 @@ class NodeLogsResponse(BaseModel):
     items: List[NodeLogItem]
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _node_response(node: Node) -> NodeResponse:
     return NodeResponse(
@@ -129,27 +101,23 @@ def _node_response(node: Node) -> NodeResponse:
     )
 
 
-def _log_item(log_obj: ProgressLog) -> NodeLogItem:
+def _log_item(log: ProgressLog) -> NodeLogItem:
     return NodeLogItem(
-        id=log_obj.id,
-        time=log_obj.created_at.isoformat(),
-        text=log_obj.text,
-        nextStep=log_obj.next_step,
-        state=log_obj.state,
+        id=log.id,
+        time=log.created_at.isoformat(),
+        text=log.text,
+        nextStep=log.next_step,
+        state=log.state,
     )
 
 
-async def _get_node_or_404(
-    node_id: str,
-    session: AsyncSession,
-    user_id: int,
-) -> Node:
+async def _get_node_or_404(node_id: str, session: AsyncSession) -> Node:
     try:
         uid = uuid.UUID(node_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid node ID format")
+        raise HTTPException(status_code=400, detail="Invalid node ID")
     result = await session.execute(
-        select(Node).where(Node.id == uid, Node.user_id == user_id)
+        select(Node).where(Node.id == uid, Node.user_id == DEFAULT_USER_ID)
     )
     node = result.scalar_one_or_none()
     if not node:
@@ -157,21 +125,18 @@ async def _get_node_or_404(
     return node
 
 
-# ─── Endpoints ────────────────────────────────────────────────────────────────
+# ─── Endpoints ───────────────────────────────────────────────────────────────
 
 @router.post("/", response_model=NodeResponse, status_code=201)
 async def create_node(
     request: NodeCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
-    request_id: str = Depends(get_request_id),
 ):
-    log.info("node_create request_id=%s user=%d", request_id, current_user.user_id)
     node = Node(
         title=request.title,
         is_hub=request.is_hub,
         status=request.status,
-        user_id=current_user.user_id,
+        user_id=DEFAULT_USER_ID,
     )
     session.add(node)
     await session.commit()
@@ -181,14 +146,13 @@ async def create_node(
 
 @router.get("/search", response_model=NodeSearchResponse)
 async def search_nodes(
-    q: str = Query(..., min_length=1, max_length=200),
+    q: str = Query(...),
     limit: int = Query(10, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     result = await session.execute(
         select(Node)
-        .where(Node.user_id == current_user.user_id, Node.title.ilike(f"%{q}%"))
+        .where(Node.user_id == DEFAULT_USER_ID, Node.title.ilike(f"%{q}%"))
         .limit(limit)
     )
     nodes = result.scalars().all()
@@ -201,16 +165,15 @@ async def search_nodes(
 async def get_node(
     node_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
     try:
         uid = uuid.UUID(node_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid node ID format")
+        raise HTTPException(status_code=400, detail="Invalid node ID")
 
     result = await session.execute(
         select(Node)
-        .where(Node.id == uid, Node.user_id == current_user.user_id)
+        .where(Node.id == uid, Node.user_id == DEFAULT_USER_ID)
         .options(selectinload(Node.progress_logs))
     )
     node = result.scalar_one_or_none()
@@ -237,11 +200,8 @@ async def update_node(
     node_id: str,
     request: NodeUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
-    request_id: str = Depends(get_request_id),
 ):
-    node = await _get_node_or_404(node_id, session, current_user.user_id)
-    log.info("node_update request_id=%s node=%s user=%d", request_id, node_id, current_user.user_id)
+    node = await _get_node_or_404(node_id, session)
     if request.title is not None:
         node.title = request.title
     if request.is_hub is not None:
@@ -257,11 +217,8 @@ async def update_node(
 async def delete_node(
     node_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
-    request_id: str = Depends(get_request_id),
 ):
-    node = await _get_node_or_404(node_id, session, current_user.user_id)
-    log.info("node_delete request_id=%s node=%s user=%d", request_id, node_id, current_user.user_id)
+    node = await _get_node_or_404(node_id, session)
     await session.delete(node)
     await session.commit()
     return {"ok": True}
@@ -272,22 +229,27 @@ async def add_log(
     node_id: str,
     request: NodeLogCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
-    request_id: str = Depends(get_request_id),
 ):
-    node = await _get_node_or_404(node_id, session, current_user.user_id)
-    log.info("log_add request_id=%s node=%s state=%s user=%d", request_id, node_id, request.state, current_user.user_id)
-    entry = ProgressLog(
+    node = await _get_node_or_404(node_id, session)
+    log = ProgressLog(
         node_id=node.id,
         text=request.text,
         state=request.state,
         next_step=request.next_step,
     )
-    session.add(entry)
-    node.status = request.state
+    session.add(log)
+    node.status = request.state  # node status tracks latest log state
+    await session.flush()  # ensure timestamps/ids exist for graph updates
+    await update_graph_edges_for_log(
+        session,
+        node_id=str(node.id),
+        state=request.state,
+        next_step=request.next_step,
+        created_at=log.created_at,
+    )
     await session.commit()
-    await session.refresh(entry)
-    return _log_item(entry)
+    await session.refresh(log)
+    return _log_item(log)
 
 
 @router.get("/{node_id}/logs", response_model=NodeLogsResponse)
@@ -295,13 +257,15 @@ async def get_node_logs(
     node_id: str,
     limit: int = Query(50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
-    # Ownership check before reading logs
-    node = await _get_node_or_404(node_id, session, current_user.user_id)
+    try:
+        uid = uuid.UUID(node_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid node ID")
+
     result = await session.execute(
         select(ProgressLog)
-        .where(ProgressLog.node_id == node.id)
+        .where(ProgressLog.node_id == uid)
         .order_by(ProgressLog.created_at.desc())
         .limit(limit)
     )
