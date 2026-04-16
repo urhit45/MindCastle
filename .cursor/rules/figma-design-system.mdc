@@ -1,0 +1,72 @@
+---
+description: Figma MCP and Stitch reference workflow for implementing MindCastle UI in tinynet-ui. Maps design exports to React, theme tokens, CSS variables, and layout invariants.
+globs: "tinynet-ui/**"
+alwaysApply: false
+---
+
+# Figma and reference-design implementation (MindCastle)
+
+## Local reference designs (Stitch)
+
+When implementing or refreshing UI, consult the exported Stitch bundle (HTML + written specs):
+
+- Root folder: `/Users/legitcaddy/Downloads/stitch_mind_castle_os`
+- **Specs (north star, surfaces, typography, components):**
+  - `ethereal_bastion/DESIGN.md` — “Ethereal Architect”; Manrope + Plus Jakarta Sans; no-line rule; glass panels; ghost borders.
+  - `nocturne_sanctuary/DESIGN.md` — “Midnight Sanctuary” / nocturnal archive; Manrope scale; focus shroud; metadata pills.
+  - `obsidian_sanctuary/DESIGN.md` — “Digital Monolith”; sapphire / emerald / amethyst accents; layering levels.
+- **Interactive references (Tailwind + token names in HTML):** any `*/code.html` under the same tree (e.g. `mobile_front_door/code.html`, `castle_customization/code.html`). Treat these as **visual and token-name references**, not as code to paste verbatim.
+
+IMPORTANT: Prefer reconciling Stitch `surface` / `primary` style names with MindCastle theme semantics (see below) instead of hardcoding hex values from the HTML.
+
+## Figma MCP integration (when the Figma server is connected)
+
+These steps apply whenever work is driven by a Figma node, not only from Stitch files.
+
+### Required flow
+
+1. Run `get_design_context` for the exact node(s) to implement.
+2. If the payload is truncated or too large, run `get_metadata`, then fetch only the needed nodes with `get_design_context`.
+3. Run `get_screenshot` for the variant you are matching.
+4. After design context and screenshot exist, download any assets from the MCP payload, then implement.
+5. Translate generated output (often React + Tailwind) into this repo’s patterns: TypeScript, `tinynet-ui` file layout, theme tokens, and CSS conventions.
+6. Validate layout and color against the screenshot; respect MindCastle invariants (Castle centered, safe areas, calm motion).
+
+### Implementation rules
+
+- Treat Figma MCP output as a **design specification**, not final code style.
+- Do **not** add Tailwind to the app solely because the MCP emitted Tailwind; map spacing, radius, and color to existing CSS and tokens.
+- Reuse components under `tinynet-ui/src/components/` before adding parallel implementations.
+- Respect **theme customization**: colors and radii should flow from `tinynet-ui/src/theme/tokens.ts` and `ThemeProvider` (CSS custom properties on `:root`), or from shared CSS variables in `tinynet-ui/src/styles.css` for the current shell—avoid one-off hex except inside `themes` presets when adding a new theme.
+
+## Component and file placement
+
+- Feature UI: `tinynet-ui/src/components/`
+- App entry and composition: `tinynet-ui/src/App.tsx`, `tinynet-ui/src/Onboarding.tsx`
+- Global layout and chrome: `tinynet-ui/src/styles.css`
+- Theme definitions and types: `tinynet-ui/src/theme/tokens.ts`, `tinynet-ui/src/theme/ThemeProvider.tsx`
+- Use `CastleViewport` from `tinynet-ui/src/components/CastleViewport.tsx` when the spec calls for a **centered, full-bleed** main region aligned with the Castle anchor (see `mindcastle-core.mdc`).
+
+## Styling and tokens
+
+- **Multi-theme tokens:** extend `ThemeName` and the `themes` record in `tokens.ts` when adding persistent colors; wire new fields through `applyThemeToDom` in `ThemeProvider.tsx` so they become CSS variables.
+- **Current app shell:** `styles.css` defines `:root` variables such as `--bg-0`, `--text-0`, `--accent`. New work should either use these or extend the theme pipeline—not arbitrary literals in JSX.
+- **Motion:** use existing `--transition` from theme or calm durations (about 200–400ms, ease-in-out) consistent with Stitch specs; avoid bouncy or flashy animations.
+
+## Stitch design principles mapped to code
+
+- **No-line rule:** avoid 1px solid borders as the primary way to separate sections; prefer background tier shifts (`--bg-app` vs `--bg-surface` / theme surfaces), spacing, or very soft translucency—aligned with `DESIGN.md` “tonal layering.”
+- **Glass / blur:** floating panels (chat, drawers, modals) may use `backdrop-filter` and semi-transparent backgrounds; keep contrast and focus states accessible.
+- **Ghost borders:** when an edge is required (inputs, dense controls), prefer low-opacity outlines using theme border variables rather than harsh full-opacity lines.
+- **Dividers in lists:** prefer vertical rhythm and alternating subtle surfaces over hairline list dividers, per Stitch card/list guidance.
+- **Typography:** Stitch specs call for **Manrope** (and sometimes **Plus Jakarta Sans** for body). The current shell uses **Syne** and **DM Mono** in `styles.css`; for screens implemented from Stitch/Figma, either match the reference fonts for parity or document a deliberate deviation in the PR—do not mix ad hoc third fonts.
+
+## Asset handling
+
+- If Figma MCP returns a **localhost** asset URL, use it directly for verification or download into the repo under a stable path (e.g. `tinynet-ui/public/`) when the feature needs a committed asset.
+- IMPORTANT: Do **not** add new icon packages when icons appear in the design payload; prefer inline SVG or provided assets.
+- Do **not** use placeholder images when a real asset URL is supplied.
+
+## Testing
+
+- Follow `testing-quality-gates.mdc`: add or update tests for layout invariants (e.g. Castle viewport centering), theme CSS variable coverage when extending `ThemeProvider`, and critical UI flows touched by the change.

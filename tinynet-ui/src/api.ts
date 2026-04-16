@@ -83,3 +83,24 @@ export function classifyText(text: string): Promise<ClassifyResult> {
     body: JSON.stringify({ text }),
   });
 }
+
+// ─── User preferences (theme sync with tinynet-api) ───────────────────────────
+
+export type ApiThemeName = "tsushima" | "transylvania" | "frieren" | "lofi";
+
+export interface UserPreferences {
+  theme: ApiThemeName | null;
+}
+
+export function getPreferences(): Promise<UserPreferences> {
+  return req("/users/me/preferences");
+}
+
+export function patchPreferences(
+  patch: Partial<UserPreferences>,
+): Promise<UserPreferences> {
+  return req("/users/me/preferences", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}

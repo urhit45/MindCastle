@@ -29,8 +29,8 @@ const TOKEN_KEYS = Object.keys(themes.lofi) as (keyof typeof themes.lofi)[];
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Release: Theme token completeness", () => {
-  it("lofi reference theme has at least 28 tokens", () => {
-    expect(TOKEN_KEYS.length).toBeGreaterThanOrEqual(28);
+  it("lofi reference theme has full token key set", () => {
+    expect(TOKEN_KEYS.length).toBeGreaterThanOrEqual(35);
   });
 
   it.each(THEME_NAMES)(
@@ -74,15 +74,20 @@ describe("Release: ThemeProvider CSS var coverage", () => {
     localStorage.clear();
   });
 
-  // The 27 CSS vars that applyThemeToDom() must write (derived from ThemeProvider source)
+  // CSS vars applyThemeToDom() writes (keep in sync with ThemeProvider.tsx)
   const EXPECTED_CSS_VARS = [
     "--bg-app", "--bg-nav", "--bg-surface", "--bg-raised", "--bg-input",
     "--bg-subtle", "--border-base", "--border-muted", "--border-strong",
     "--text-primary", "--text-secondary", "--text-muted", "--text-ghost",
-    "--accent", "--accent-dim", "--dot-active", "--dot-blocked",
-    "--dot-planned", "--dot-planning", "--dot-start", "--dot-end",
-    "--dot-idea", "--mist", "--transition", "--radius-sm", "--radius-md",
-    "--scrollbar-thumb", "--scrollbar-track",
+    "--accent", "--accent-dim", "--accent-secondary", "--accent-good", "--accent-warn",
+    "--dot-active", "--dot-blocked", "--dot-planned", "--dot-planning", "--dot-start",
+    "--dot-end", "--dot-idea", "--mist", "--shell-glow-a", "--shell-glow-b",
+    "--shimmer-a", "--shimmer-b", "--glass-tint", "--line-ghost", "--transition",
+    "--radius-sm", "--radius-md", "--scrollbar-thumb", "--scrollbar-track",
+    "--bg-0", "--bg-1", "--bg-2", "--text-0", "--text-1", "--text-2", "--accent-2",
+    "--good", "--warn", "--glass", "--line",
+    "--motion-standard", "--motion-deep", "--motion-soft-entry", "--motion-ambient",
+    "--font-display", "--font-body",
   ] as const;
 
   it.each(THEME_NAMES)(

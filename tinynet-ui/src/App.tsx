@@ -1,5 +1,7 @@
 import React from 'react'
 import './styles.css'
+import { ThemePreferenceSync } from './components/ThemePreferenceSync'
+import { ThemeSwitcher } from './components/ThemeSwitcher'
 import ChatDock from './components/ChatDock'
 import ApiDemo from './components/ApiDemo'
 import OneNextTaskView, { type EngineSwitchRequest, type NextTaskCandidate } from './components/OneNextTaskView'
@@ -138,10 +140,14 @@ function App() {
 
   return (
     <div className="app-shell">
+      <ThemePreferenceSync />
       <div className="app-backdrop" />
       <header className="app-topbar">
         <div className="app-topbar-brand">MIND · CASTLE</div>
-        <div className="app-topbar-mode">{onboardingComplete ? 'FLOW MODE' : 'ONBOARDING'}</div>
+        <div className="app-topbar-right">
+          <ThemeSwitcher />
+          <div className="app-topbar-mode">{onboardingComplete ? 'FLOW MODE' : 'ONBOARDING'}</div>
+        </div>
       </header>
 
       <div className="app-content">

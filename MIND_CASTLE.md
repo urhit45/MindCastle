@@ -5,12 +5,14 @@ A personal operating system for focus, life, and mental clarity. "A second brain
 
 ### Society Assumes. Reality Differs.
 
-| What the world assumes | What many people experience |
-|---|---|
-| Stable attention spans | Overwhelm leads to paralysis |
-| Linear, orderly thinking | Hyperfocus leads to burnout |
-| Consistent day-to-day motivation | Rigid to-do lists cause anxiety |
-| Endless working memory | Time feels abstract and slippery |
+
+| What the world assumes           | What many people experience      |
+| -------------------------------- | -------------------------------- |
+| Stable attention spans           | Overwhelm leads to paralysis     |
+| Linear, orderly thinking         | Hyperfocus leads to burnout      |
+| Consistent day-to-day motivation | Rigid to-do lists cause anxiety  |
+| Endless working memory           | Time feels abstract and slippery |
+
 
 ### Why Existing Tools Fail
 
@@ -40,6 +42,17 @@ Zero friction capture — Voice, text, or photo. Offload your brain in seconds.
 No guilt UX — No shame notifications. No manipulative algorithms. No data mining.
 Visual time — A tangible sense of passing time to combat time-blindness.
 Human control — Export your data anytime. Your mind belongs to you.
+
+## Visual language and motion (THEME ideas)
+
+Product-facing rationale, motion choreography, and reference palettes live under `tinynet-ui/THEME ideas/` (for example `mind_castle_design_rationale.md`, `nocturne_sanctuary_motion_specs.md`, and the `*/DESIGN.md` files). The shipped UI maps those ideas into code as follows:
+
+- **Tokens** — `tinynet-ui/src/theme/tokens.ts` defines palette presets; `ThemeProvider` injects them as CSS custom properties on `:root` (including legacy names such as `--bg-0` used across `styles.css`).
+- **Typography** — Manrope for display-weight headings and Plus Jakarta Sans for body copy, per the Ethereal Architect spec.
+- **Motion** — Global easing from the Nocturne Sanctuary motion doc (`--motion-standard`, `--motion-deep`, `--motion-soft-entry`, `--motion-ambient` on an eight-second ambient loop).
+- **Time-flow hint** — The One Next Task panel uses a slow, low-contrast shimmer using theme-driven `--shimmer-a` / `--shimmer-b` (teal / violet family from the motion spec).
+
+Theme choice is stored in `localStorage` and, when the FastAPI backend is available, mirrored under `GET/PATCH /users/me/preferences` so the same palette can follow you across browsers on the same machine.
 
 ## Who It's For
 
@@ -80,15 +93,17 @@ A list of Artifacts
 
 An Artifact is a project, goal, or task living inside an engine.
 
-| Field | Description |
-|---|---|
-| title | The name of the project or task |
-| subtitle | One-line description |
-| status | concept · active · planned · live · blocked · planning |
-| next | The single next step (prevents paralysis) |
-| stack | Tags or technologies associated |
-| progress | Named progress bars (e.g. "Feature A: 45%") |
-| notes | Free-form working notes |
+
+| Field    | Description                                            |
+| -------- | ------------------------------------------------------ |
+| title    | The name of the project or task                        |
+| subtitle | One-line description                                   |
+| status   | concept · active · planned · live · blocked · planning |
+| next     | The single next step (prevents paralysis)              |
+| stack    | Tags or technologies associated                        |
+| progress | Named progress bars (e.g. "Feature A: 45%")            |
+| notes    | Free-form working notes                                |
+
 
 ### Nodes (Backend)
 
@@ -98,26 +113,31 @@ When an artifact is first saved, it creates a Node in the backend database — a
 
 ### Current (v0.1)
 
-| Feature | Description |
-|---|---|
-| Engine management | Create, edit, delete life-domain containers with custom icons and colors |
-| Artifact tracking | Projects and tasks with status, next step, progress bars, and notes |
-| Progress logging | Free-text log entries classified by AI (state + category + next step) |
+
+| Feature            | Description                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| Engine management  | Create, edit, delete life-domain containers with custom icons and colors            |
+| Artifact tracking  | Projects and tasks with status, next step, progress bars, and notes                 |
+| Progress logging   | Free-text log entries classified by AI (state + category + next step)               |
 | TinyNet classifier | On-device multi-task model: detects 20 categories, 6 states, 12 next-step templates |
-| Context per engine | Private AI instruction block injected per domain |
-| Local-only storage | All data in localStorage — nothing leaves your machine |
-| Backend sync | Optional FastAPI backend for persistent node history and log retrieval |
+| Context per engine | Private AI instruction block injected per domain                                    |
+| Sanctuary themes   | Four palettes (Tsushima, Transylvania, Frieren, Lo-fi), calm motion tokens, Manrope / Plus Jakarta; top-bar picker |
+| Local-only storage | All data in localStorage — nothing leaves your machine                              |
+| Backend sync       | Optional FastAPI backend for nodes, logs, and `GET`/`PATCH /users/me/preferences` (theme) |
+
 
 ### Planned
 
-| Feature | Description |
-|---|---|
-| Time-Flow | A visual sense of passing time — a flowing display to combat time-blindness |
-| Transition Mode | 60-second ritual to switch gears between engines without burnout |
-| Focus Mode | Deep-work sanctuary — one artifact, full screen, visual time flow |
-| Mind Map | Interactive graph of your nodes and their connections |
-| Review Panel | Surfaces blocked, stale, and next-step items automatically |
-| Voice capture | Zero-friction entry via microphone |
+
+| Feature         | Description                                                                 |
+| --------------- | --------------------------------------------------------------------------- |
+| Time-Flow       | A visual sense of passing time — a flowing display to combat time-blindness |
+| Transition Mode | 60-second ritual to switch gears between engines without burnout            |
+| Focus Mode      | Deep-work sanctuary — one artifact, full screen, visual time flow           |
+| Mind Map        | Interactive graph of your nodes and their connections                       |
+| Review Panel    | Surfaces blocked, stale, and next-step items automatically                  |
+| Voice capture   | Zero-friction entry via microphone                                          |
+
 
 ## Onboarding Paths
 
@@ -190,6 +210,7 @@ Falls back to a single "General" engine if the backend is offline.
 │  PATCH /nodes/{id}    ← update node title/status        │
 │  POST /nodes/{id}/logs ← append progress log            │
 │  GET  /nodes/{id}/logs ← retrieve log history           │
+│  GET/PATCH /users/me/preferences ← UI theme (JSON prefs) │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │           TinyNet  (PyTorch, CPU-only)           │  │
@@ -207,16 +228,18 @@ Falls back to a single "General" engine if the backend is offline.
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, TypeScript, Vite 5 |
-| State | useState + localStorage (Zustand planned) |
-| Graph view | react-force-graph-2d |
-| Backend | FastAPI 0.104, SQLAlchemy 2 async, Pydantic v2 |
-| Database | SQLite (async via aiosqlite) |
-| ML model | PyTorch 2.0 (CPU), scikit-learn (vectorizer) |
-| Migrations | Alembic |
-| Config | PyYAML (backend/config/labels.yaml) |
+
+| Layer      | Technology                                     |
+| ---------- | ---------------------------------------------- |
+| Frontend   | React 18, TypeScript, Vite 5                   |
+| State      | useState + localStorage (Zustand planned)      |
+| Graph view | react-force-graph-2d                           |
+| Backend    | FastAPI 0.104, SQLAlchemy 2 async, Pydantic v2 |
+| Database   | SQLite (async via aiosqlite)                   |
+| ML model   | PyTorch 2.0 (CPU), scikit-learn (vectorizer)   |
+| Migrations | Alembic                                        |
+| Config     | PyYAML (backend/config/labels.yaml)            |
+
 
 ## Data Model
 
@@ -284,14 +307,16 @@ Fitness Running Strength Music Guitar Learning AI Admin Finance Social Health Co
 
 ## TinyNet States (6)
 
-| State | Meaning |
-|---|---|
-| start | Beginning a new activity |
-| continue | Resuming ongoing work |
-| pause | Temporarily stepping back |
-| end | Completed or closing |
-| blocked | Stuck, waiting, or uncertain |
-| idea | Brainstorm or concept |
+
+| State    | Meaning                      |
+| -------- | ---------------------------- |
+| start    | Beginning a new activity     |
+| continue | Resuming ongoing work        |
+| pause    | Temporarily stepping back    |
+| end      | Completed or closing         |
+| blocked  | Stuck, waiting, or uncertain |
+| idea     | Brainstorm or concept        |
+
 
 ## Next Step Templates (12)
 
@@ -330,15 +355,17 @@ color (hex) and icon (any Unicode glyph) are optional — defaults are assigned 
 
 ## Privacy & Trust
 
-| Principle | Implementation |
-|---|---|
-| Local-first | All engine and artifact data lives in browser localStorage. Nothing is sent to any external server. |
-| Optional backend | The FastAPI backend runs on localhost:8000. It never communicates with the internet. |
-| No telemetry | Zero analytics, zero crash reporting, zero usage tracking. |
-| No accounts | No sign-up, no email, no cloud sync. User ID 1 is always local@mindcastle. |
-| Data portability | Export your castle at any time via the import JSON schema. Your data is a plain JSON file. |
-| Open source | All code is readable and auditable. No black boxes. |
-| No lock-in | Export your data anytime. Delete the app and nothing is left behind except what's in your browser. |
+
+| Principle        | Implementation                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| Local-first      | All engine and artifact data lives in browser localStorage. Nothing is sent to any external server. |
+| Optional backend | The FastAPI backend runs on localhost:8000. It never communicates with the internet.                |
+| No telemetry     | Zero analytics, zero crash reporting, zero usage tracking.                                          |
+| No accounts      | No sign-up, no email, no cloud sync. User ID 1 is always local@mindcastle.                          |
+| Data portability | Export your castle at any time via the import JSON schema. Your data is a plain JSON file.          |
+| Open source      | All code is readable and auditable. No black boxes.                                                 |
+| No lock-in       | Export your data anytime. Delete the app and nothing is left behind except what's in your browser.  |
+
 
 User data is treated as a personal archive, not raw material. Trust is the core feature.
 
@@ -364,7 +391,7 @@ npm run dev
 ```bash
 cd tinynet-api
 pip install -r requirements.txt
-make db-upgrade    # run Alembic migrations
+make db-upgrade    # run Alembic migrations (includes users.preferences for theme sync)
 make api           # starts uvicorn on :8000
 ```
 
@@ -383,7 +410,9 @@ make api          # model retrains on next start (< 1s)
 ```
 MindCastle/
 ├── tinynet-ui/                 # React frontend
+│   ├── THEME ideas/            # Design rationale, motion, reference exports
 │   └── src/
+│       ├── theme/              # tokens.ts, ThemeProvider
 │       ├── App.tsx             # Main application
 │       ├── Onboarding.tsx      # First-run onboarding wizard
 │       └── api.ts              # Backend API client
@@ -392,6 +421,7 @@ MindCastle/
 │   │   ├── routers/
 │   │   │   ├── classify.py     # POST /classify/
 │   │   │   ├── nodes.py        # Node CRUD + logs
+│   │   │   ├── preferences.py  # GET/PATCH /users/me/preferences
 │   │   │   └── home.py         # Review queue
 │   │   ├── ml/
 │   │   │   ├── tinynet.py      # Multi-task neural net
@@ -463,6 +493,6 @@ Mind Castle is not a productivity app. It is a place your mind can come home to.
 
 ## Contact
 
-Reach out: contact@mindcastle.io
+Reach out: [contact@mindcastle.io](mailto:contact@mindcastle.io)
 
 Built with care for the non-linear mind.

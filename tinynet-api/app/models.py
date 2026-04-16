@@ -16,6 +16,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=func.now())
+    # UI prefs (e.g. tinynet-ui theme); local-first app syncs optional copy here
+    preferences = Column(JSON, nullable=False, default=dict, server_default="{}")
     
     # Relationships
     nodes = relationship("Node", back_populates="user")

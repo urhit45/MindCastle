@@ -269,3 +269,6 @@ logs
 # Temporary files
 *.tmp
 *.temp
+
+# MindCastle — local design exports / reference HTML (not versioned)
+tinynet-ui/THEME ideas/

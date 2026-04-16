@@ -9,13 +9,15 @@
 
 ### tinynet-api (`tinynet-api/.env`)
 
-| Variable | Default | Override | Notes |
-|---|---|---|---|
-| `TINYNET_DATABASE_URL` | `sqlite+aiosqlite:///./tinynet.db` | Required for Postgres | SQLite is fine for local/single-user |
-| `TINYNET_DEBUG` | `false` | `true` in dev | Enables FastAPI debug mode |
-| `TINYNET_APP_NAME` | `TinyNet API` | Optional | Surfaced at `/` |
-| `TINYNET_ALLOWED_ORIGINS` | `["http://localhost:5173", ...]` | JSON list | Add your domain for prod |
-| `TINYNET_LOG_LEVEL` | `INFO` | `DEBUG` / `WARNING` | Sets root logger level |
+
+| Variable                  | Default                            | Override              | Notes                                |
+| ------------------------- | ---------------------------------- | --------------------- | ------------------------------------ |
+| `TINYNET_DATABASE_URL`    | `sqlite+aiosqlite:///./tinynet.db` | Required for Postgres | SQLite is fine for local/single-user |
+| `TINYNET_DEBUG`           | `false`                            | `true` in dev         | Enables FastAPI debug mode           |
+| `TINYNET_APP_NAME`        | `TinyNet API`                      | Optional              | Surfaced at `/`                      |
+| `TINYNET_ALLOWED_ORIGINS` | `["http://localhost:5173", ...]`   | JSON list             | Add your domain for prod             |
+| `TINYNET_LOG_LEVEL`       | `INFO`                             | `DEBUG` / `WARNING`   | Sets root logger level               |
+
 
 Config is loaded via `pydantic-settings` with prefix `TINYNET_`. Copy `.env` and edit.
 
@@ -24,16 +26,18 @@ Config is loaded via `pydantic-settings` with prefix `TINYNET_`. Copy `.env` and
 No env vars required at runtime — all config is baked in at build time via Vite.
 
 - **API URL**: hardcoded to `http://localhost:8000` in `tinynet-ui/src/api.ts`.
-  Change for staging/prod and rebuild: `npm run build`.
+Change for staging/prod and rebuild: `npm run build`.
 
 ### Model + data paths (relative to `tinynet-api/`)
 
-| Path | Purpose |
-|---|---|
-| `data/train.jsonl` | Training corpus (bootstrapped labels) |
-| `models/best.pt` | Best checkpoint (loaded at startup if present) |
-| `runs/<run_id>/` | Per-run training artifacts |
+
+| Path                         | Purpose                                            |
+| ---------------------------- | -------------------------------------------------- |
+| `data/train.jsonl`           | Training corpus (bootstrapped labels)              |
+| `models/best.pt`             | Best checkpoint (loaded at startup if present)     |
+| `runs/<run_id>/`             | Per-run training artifacts                         |
 | `backend/config/labels.yaml` | Canonical category / state / next-step definitions |
+
 
 ---
 
@@ -125,40 +129,42 @@ make db-status
 ### Model
 
 - **Small training corpus**: bootstrapped from keyword rules, not human-labelled data.
-  Confidence scores are not calibrated probabilities — treat thresholds as heuristics.
+Confidence scores are not calibrated probabilities — treat thresholds as heuristics.
 - **English only**: no multi-language support. Non-English input will get low-confidence
-  predictions and likely trigger ABSTAIN or DEFER safety mode.
+predictions and likely trigger ABSTAIN or DEFER safety mode.
 - **Drift detection is a proxy**: uses L2 norm of feature vectors as an input-drift signal,
-  not a full distribution test (e.g., MMD). Alerts are early warnings, not guarantees.
+not a full distribution test (e.g., MMD). Alerts are early warnings, not guarantees.
 - **No demographic parity guarantees**: fairness checks run at training time; meaningful
-  only when training data includes labelled group metadata.
+only when training data includes labelled group metadata.
 
 ### API
 
 - **In-memory rate limiting**: counters reset on process restart. Not suitable for
-  multi-process/multi-instance deployments without an external counter store.
+multi-process/multi-instance deployments without an external counter store.
 - **SQLite default**: not suitable for concurrent writers. Switch to Postgres for
-  multi-user production use.
+multi-user production use.
 - **Auth stub**: `get_current_user()` always returns `user_id=1` (MVP). Replace with
-  real JWT/session auth before opening to multiple users.
+real JWT/session auth before opening to multiple users.
 
 ### UI
 
 - **No offline support**: requires the API to be running. No service worker / PWA.
 - **Local state only**: all engine/artifact data lives in the browser's in-memory state
-  (synced to API nodes but not fully persisted across hard refreshes without a page reload).
+(synced to API nodes but not fully persisted across hard refreshes without a page reload).
 
 ### Pre-existing test failures (not blocking)
 
 These failures existed before Phase IV and reflect test assertion mismatches, not bugs
 in the production code:
 
-| Test | Root cause |
-|---|---|
-| `test_vectorizer::test_empty_text` | Hashing vectorizer produces 1 non-zero bucket for `""` (valid behavior; test assertion wrong) |
-| `test_vectorizer::test_different_seeds` | Determinism assertion mismatch |
-| `test_training_loop::test_dataset_item` | Shape assertion off-by-one |
-| `test_api_contract` (4 node tests) | Tests expect pre-seeded DB rows; DB is empty in CI |
+
+| Test                                    | Root cause                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `test_vectorizer::test_empty_text`      | Hashing vectorizer produces 1 non-zero bucket for `""` (valid behavior; test assertion wrong) |
+| `test_vectorizer::test_different_seeds` | Determinism assertion mismatch                                                                |
+| `test_training_loop::test_dataset_item` | Shape assertion off-by-one                                                                    |
+| `test_api_contract` (4 node tests)      | Tests expect pre-seeded DB rows; DB is empty in CI                                            |
+
 
 ---
 
@@ -168,12 +174,14 @@ Run before every release: `bash scripts/release_gate.sh`
 
 Or gate-by-gate: `make release-check`
 
-| Gate | Command | Must pass |
-|---|---|---|
-| 1. Product Experience | `npm run test:run` | Yes |
-| 2. Technical Reliability | `npm run lint && npm run typecheck` | Yes |
-| 3. Backend + Model | `python3 scripts/release_gate.py` | Yes |
-| 4. Quality | `make api-test-unit api-test-integration api-test-load` | Yes |
-| 5. Release Ops | Automated file + content checks | Yes |
+
+| Gate                     | Command                                                 | Must pass |
+| ------------------------ | ------------------------------------------------------- | --------- |
+| 1. Product Experience    | `npm run test:run`                                      | Yes       |
+| 2. Technical Reliability | `npm run lint && npm run typecheck`                     | Yes       |
+| 3. Backend + Model       | `python3 scripts/release_gate.py`                       | Yes       |
+| 4. Quality               | `make api-test-unit api-test-integration api-test-load` | Yes       |
+| 5. Release Ops           | Automated file + content checks                         | Yes       |
+
 
 **Do not merge or deploy if any gate is red.**

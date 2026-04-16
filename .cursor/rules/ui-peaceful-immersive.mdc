@@ -1,14 +1,40 @@
 ---
-description: Core product and architecture principles for MindCastle
+description: Peaceful, low-cognitive-load UI direction and alignment with local Stitch reference designs for MindCastle.
 alwaysApply: true
 ---
 
-# MindCastle Core Rules
+# MindCastle UI: calm, immersive, reference-aligned
 
-- Preserve a calm, low-cognitive-load product direction in all decisions.
-- Keep architecture future-proof: modular boundaries, typed interfaces, config-driven behavior.
-- Avoid hardcoded product assumptions that block premium upgrades or customization.
-- Theme customization is mandatory by default; no feature should assume a single theme.
-- App should use full available screen space while respecting safe areas.
-- The Castle is the visual anchor and must remain centered in the usable viewport.
-- Prefer extensible abstractions over one-off implementations.
+Shared product and layout rules (modularity, theme mandate, Castle as anchor, safe areas) live in `mindcastle-core.mdc`. This file adds **visual and interaction** guidance and ties them to the **Stitch Mind Castle OS** export.
+
+## Reference designs (Stitch bundle)
+
+Use this folder as the authoritative **visual spec** when building or refactoring screens to match the latest OS concept:
+
+`/Users/legitcaddy/Downloads/stitch_mind_castle_os`
+
+- Read `*/DESIGN.md` for north star, surface hierarchy, typography roles, elevation, and component behaviors (e.g. ghost borders, glass panels, “no-line” separation, list/divider rules).
+- Use `*/code.html` for **token names**, Tailwind structure, and component composition hints—not as drop-in production code.
+
+When Stitch and the live app disagree, prefer **MindCastle theme tokens** (`tinynet-ui/src/theme/tokens.ts`, CSS vars from `ThemeProvider`, and variables in `tinynet-ui/src/styles.css`) and extend tokens instead of scattering raw hex from the HTML.
+
+## Atmosphere
+
+- Preserve a **sanctuary** feel: soft depth, tonal layering, and generous whitespace over dense grids.
+- Prefer **tonal boundaries** (background shifts, subtle elevation) over hard 1px section borders unless an accessibility edge is required—then use a **ghost** / low-opacity treatment.
+- Primary actions can use **muted gradients** or calm accent fills consistent with Stitch “glass and gradient” guidance; avoid loud, saturated CTA patterns.
+- Lists and feeds: favor spacing and alternating **surface tiers** over hairline dividers between rows.
+
+## Typography and motion
+
+- Reference layouts specify **Manrope** (and **Plus Jakarta Sans** in Ethereal Architect) for a warmer editorial voice; the shipped shell currently uses **Syne** and **DM Mono** in `styles.css`. When porting a Stitch screen literally, align fonts with the reference or update the shell consciously in one pass—avoid one-off `@import` per component.
+- Interactions: smooth opacity and gentle translate; about **200–400ms** ease-in-out; no aggressive ripples or elastic motion.
+
+## Castle and layout
+
+- The **Castle remains the visual anchor** and stays **centered in the usable viewport** when a Castle scene is on screen (see `CastleViewport` and `mindcastle-core.mdc`).
+- Use **full available space** with comfortable insets; intentional asymmetry from Stitch is allowed for **editorial** blocks when it does not fight centering of the primary anchor.
+
+## Figma-driven work
+
+For Figma MCP steps, token mapping, and asset rules, use `.cursor/rules/figma-design-system.mdc` (scoped to `tinynet-ui/**`). If the Figma MCP server is not connected, rely on Stitch `DESIGN.md` + `code.html` and screenshots from design reviews.
