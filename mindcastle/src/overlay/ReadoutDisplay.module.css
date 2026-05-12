@@ -1,0 +1,28 @@
+.container {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.state {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  color: var(--color-text-warm);
+  transition: color 2s ease;
+}
+
+.task {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--color-text-light);
+  max-width: 400px;
+  transition: color 2s ease;
+}

@@ -1,0 +1,54 @@
+.panel {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--color-text-warm);
+  margin-bottom: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--color-text-mid);
+  width: 62px;
+}
+
+.track {
+  width: 80px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 2s ease;
+}
+
+.value {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-dim);
+  width: 32px;
+  text-align: right;
+}

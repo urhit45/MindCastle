@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500&family=Crimson+Pro:ital,wght@0,400;1,400&display=swap');
+
+:root {
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Crimson Pro', serif;
+
+  --color-bg:           #0a0a0f;
+  --color-stone-dark:   #08070a;
+  --color-text-dim:     #3a3028;
+  --color-text-mid:     #5a4e3a;
+  --color-text-warm:    #7a6a52;
+  --color-text-light:   #c8b89a;
+  --color-border:       rgba(120, 100, 70, 0.15);
+  --color-border-hover: rgba(120, 100, 70, 0.3);
+}
