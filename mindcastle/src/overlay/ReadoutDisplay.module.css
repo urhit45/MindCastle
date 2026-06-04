@@ -1,0 +1,29 @@
+.readout {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.state {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: #4a3e2a;
+  margin-bottom: 10px;
+  transition: color 2s ease;
+}
+
+.task {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 16px;
+  color: #8a7a62;
+  max-width: 400px;
+  line-height: 1.5;
+  transition: opacity 1s ease, color 2s ease;
+}
