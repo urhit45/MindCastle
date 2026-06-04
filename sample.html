@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MindCastle</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    overflow: hidden;
+    font-family: 'Crimson Pro', Georgia, serif;
+    color: #c8b89a;
+  }
+
+  #renderCanvas {
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+  }
+
+  /* HUD overlay */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* State vector display — top left */
+  #state-panel {
+    position: absolute;
+    top: 32px;
+    left: 32px;
+    pointer-events: none;
+  }
+
+  #castle-name {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #7a6a52;
+    margin-bottom: 16px;
+  }
+
+  .state-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .state-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #5a4e3a;
+    width: 72px;
+  }
+
+  .state-bar-track {
+    width: 80px;
+    height: 2px;
+    background: rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .state-bar-fill {
+    height: 100%;
+    transition: width 2s ease;
+    position: relative;
+  }
+
+  .state-bar-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -2px;
+    width: 1px;
+    height: 6px;
+    background: inherit;
+    filter: brightness(2);
+  }
+
+  .state-value {
+    font-size: 10px;
+    color: #5a4e3a;
+    width: 28px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Readout state — bottom center */
+  #readout {
+    position: absolute;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #readout-state {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: #4a3e2a;
+    margin-bottom: 10px;
+    transition: color 2s ease;
+  }
+
+  #readout-task {
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: #8a7a62;
+    max-width: 400px;
+    line-height: 1.5;
+    transition: opacity 1s ease, color 2s ease;
+  }
+
+  /* Engine tooltip */
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    background: rgba(10, 9, 8, 0.85);
+    border: 1px solid rgba(120, 100, 70, 0.2);
+    padding: 12px 16px;
+    min-width: 160px;
+  }
+
+  #tooltip.visible { opacity: 1; }
+
+  #tooltip-name {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: #c8b89a;
+    margin-bottom: 4px;
+  }
+
+  #tooltip-status {
+    font-size: 12px;
+    font-style: italic;
+    color: #5a4e3a;
+    margin-bottom: 8px;
+  }
+
+  #tooltip-next {
+    font-size: 11px;
+    color: #7a6a52;
+    line-height: 1.5;
+  }
+
+  /* Engine detail panel — slides in from right */
+  #engine-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 340px;
+    height: 100%;
+    background: rgba(8, 7, 6, 0.92);
+    border-left: 1px solid rgba(120, 100, 70, 0.15);
+    transform: translateX(100%);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: all;
+    overflow-y: auto;
+    padding: 40px 32px;
+  }
+
+  #engine-panel.open { transform: translateX(0); }
+
+  #panel-close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: none;
+    border: none;
+    color: #5a4e3a;
+    cursor: pointer;
+    font-size: 18px;
+    font-family: 'Crimson Pro', serif;
+    transition: color 0.2s;
+  }
+
+  #panel-close:hover { color: #c8b89a; }
+
+  #panel-engine-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  #panel-engine-name {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    letter-spacing: 0.15em;
+    color: #c8b89a;
+    margin-bottom: 4px;
+  }
+
+  #panel-engine-subtitle {
+    font-size: 13px;
+    font-style: italic;
+    color: #5a4e3a;
+    margin-bottom: 24px;
+  }
+
+  .artifact-card {
+    border: 1px solid rgba(120, 100, 70, 0.12);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .artifact-card:hover {
+    border-color: rgba(120, 100, 70, 0.3);
+    background: rgba(120, 100, 70, 0.05);
+  }
+
+  .artifact-title {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #a89878;
+    margin-bottom: 4px;
+  }
+
+  .artifact-next {
+    font-size: 12px;
+    font-style: italic;
+    color: #4a3e2a;
+    line-height: 1.5;
+  }
+
+  .artifact-status {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    margin-top: 8px;
+  }
+
+  .status-active { color: #6a9a7a; border: 1px solid rgba(106,154,122,0.3); }
+  .status-blocked { color: #9a6a6a; border: 1px solid rgba(154,106,106,0.3); }
+  .status-concept { color: #5a4e3a; border: 1px solid rgba(90,78,58,0.3); }
+  .status-planned { color: #7a8a9a; border: 1px solid rgba(122,138,154,0.3); }
+
+  /* Vignette overlay */
+  #vignette {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Loading screen */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: #0a0a0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 1s ease;
+  }
+
+  #loading.fade { opacity: 0; pointer-events: none; }
+
+  #loading-title {
+    font-family: 'Cinzel', serif;
+    font-size: 28px;
+    letter-spacing: 0.4em;
+    color: #c8b89a;
+    margin-bottom: 8px;
+  }
+
+  #loading-sub {
+    font-family: 'Crimson Pro', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: #3a3028;
+    letter-spacing: 0.1em;
+  }
+
+  #loading-bar-track {
+    width: 200px;
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin-top: 40px;
+    overflow: hidden;
+  }
+
+  #loading-bar {
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #c8b89a, transparent);
+    width: 0%;
+    transition: width 0.3s ease;
+    animation: shimmer 1.5s ease infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200px; }
+    100% { background-position: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-title">MINDCASTLE</div>
+  <div id="loading-sub">preparing your castle</div>
+  <div id="loading-bar-track"><div id="loading-bar"></div></div>
+</div>
+
+<canvas id="renderCanvas"></canvas>
+
+<div id="vignette"></div>
+
+<div id="hud">
+  <div id="state-panel">
+    <div id="castle-name">Your Castle</div>
+    <div class="state-row">
+      <div class="state-label">Energy</div>
+      <div class="state-bar-track">
+        <div class="state-bar-fill" id="bar-energy" style="width:65%; background: linear-gradient(90deg, #4a7a5a, #6a9a7a);"></div>
+      </div>
+      <div class="state-value" id="val-energy">0.65</div>
+    </div>
+    <div class="state-row">
+      <div class="state-label">Momentum</div>
+      <div class="state-bar-track">
+        <div class="state-bar-fill" id="bar-momentum" style="width:72%; background: linear-gradient(90deg, #4a5a7a, #6a7a9a);"></div>
+      </div>
+      <div class="state-value" id="val-momentum">0.72</div>
+    </div>
+    <div class="state-row">
+      <div class="state-label">Risk</div>
+      <div class="state-bar-track">
+        <div class="state-bar-fill" id="bar-risk" style="width:28%; background: linear-gradient(90deg, #7a4a4a, #9a6a6a);"></div>
+      </div>
+      <div class="state-value" id="val-risk">0.28</div>
+    </div>
+    <div class="state-row">
+      <div class="state-label">Readiness</div>
+      <div class="state-bar-track">
+        <div class="state-bar-fill" id="bar-readiness" style="width:58%; background: linear-gradient(90deg, #7a6a4a, #9a8a6a);"></div>
+      </div>
+      <div class="state-value" id="val-readiness">0.58</div>
+    </div>
+  </div>
+
+  <div id="readout">
+    <div id="readout-state">flow available</div>
+    <div id="readout-task">Your Tech Builder tower is lit. One deep session awaits.</div>
+  </div>
+
+  <div id="tooltip">
+    <div id="tooltip-name"></div>
+    <div id="tooltip-status"></div>
+    <div id="tooltip-next"></div>
+  </div>
+</div>
+
+<div id="engine-panel">
+  <button id="panel-close" onclick="closePanel()">✕</button>
+  <div id="panel-engine-icon"></div>
+  <div id="panel-engine-name"></div>
+  <div id="panel-engine-subtitle"></div>
+  <div id="panel-artifacts"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.48.1/babylon.js"></script>
+<script>
+// ─── CASTLE DATA ────────────────────────────────────────────────────────────
+
+const ENGINES = [
+  {
+    id: 'tech',
+    name: 'Tech Builder',
+    subtitle: 'Code, systems & side projects',
+    icon: '◈',
+    color: { r: 0.2, g: 0.7, b: 0.8 },
+    hexColor: '#3ecfcf',
+    position: { x: -3, z: -3 },
+    status: 'active',
+    activityLevel: 0.85,
+    structure: 'tower',
+    artifacts: [
+      { title: 'TinyNet API', status: 'active', next: 'Write integration tests for /classify/ endpoint' },
+      { title: 'MindCastle UI', status: 'active', next: 'Rebuild as Babylon.js 3D world' },
+      { title: 'Signal Bridge', status: 'planned', next: 'Wire HealthKit to FastAPI endpoint' }
+    ]
+  },
+  {
+    id: 'health',
+    name: 'Health',
+    subtitle: 'Fitness, sleep & nutrition',
+    icon: '◎',
+    color: { r: 0.3, g: 0.8, b: 0.4 },
+    hexColor: '#4dcc66',
+    position: { x: 3, z: -3 },
+    status: 'blocked',
+    activityLevel: 0.15,
+    structure: 'garden',
+    artifacts: [
+      { title: 'Morning run habit', status: 'blocked', next: 'Start with 10 minutes, not 30' },
+      { title: 'Sleep consistency', status: 'concept', next: 'Set a soft wind-down alarm at 10pm' }
+    ]
+  },
+  {
+    id: 'finance',
+    name: 'Finance',
+    subtitle: 'Budgets, savings & investing',
+    icon: '⬡',
+    color: { r: 0.9, g: 0.7, b: 0.2 },
+    hexColor: '#e6b233',
+    position: { x: 3, z: 3 },
+    status: 'planned',
+    activityLevel: 0.35,
+    structure: 'vault',
+    artifacts: [
+      { title: 'Tax filing', status: 'concept', next: 'Gather receipts folder first' },
+      { title: 'Investment review', status: 'planned', next: 'Schedule 30 min Sunday review' }
+    ]
+  },
+  {
+    id: 'creative',
+    name: 'Creative',
+    subtitle: 'Art, design & making things',
+    icon: '◇',
+    color: { r: 0.8, g: 0.3, b: 0.7 },
+    hexColor: '#cc4db3',
+    position: { x: -3, z: 3 },
+    status: 'active',
+    activityLevel: 0.6,
+    structure: 'workshop',
+    artifacts: [
+      { title: 'Castle visual design', status: 'active', next: 'Define atmosphere per engine state' },
+      { title: 'Sound design system', status: 'planned', next: 'Map state vector to audio parameters' }
+    ]
+  },
+  {
+    id: 'learning',
+    name: 'Learning',
+    subtitle: 'Books, courses & deep dives',
+    icon: '⟁',
+    color: { r: 0.4, g: 0.5, b: 0.9 },
+    hexColor: '#6680e6',
+    position: { x: 0, z: -5 },
+    status: 'active',
+    activityLevel: 0.7,
+    structure: 'library',
+    artifacts: [
+      { title: 'Reservoir computing', status: 'active', next: 'Read Jaeger 2001 paper' },
+      { title: 'Babylon.js mastery', status: 'active', next: 'Work through PBR materials guide' }
+    ]
+  },
+  {
+    id: 'writing',
+    name: 'Writing',
+    subtitle: 'Essays, docs & storytelling',
+    icon: '✦',
+    color: { r: 0.9, g: 0.6, b: 0.3 },
+    hexColor: '#e6993d',
+    position: { x: 0, z: 5 },
+    status: 'concept',
+    activityLevel: 0.25,
+    structure: 'study',
+    artifacts: [
+      { title: 'MindCastle manifesto', status: 'active', next: 'Finish the design principles section' }
+    ]
+  },
+  {
+    id: 'social',
+    name: 'Social',
+    subtitle: 'Relationships & community',
+    icon: '△',
+    color: { r: 0.9, g: 0.4, b: 0.4 },
+    hexColor: '#e66666',
+    position: { x: -5, z: 0 },
+    status: 'concept',
+    activityLevel: 0.2,
+    structure: 'hall',
+    artifacts: [
+      { title: 'Community building', status: 'concept', next: 'Define who MindCastle is for first' }
+    ]
+  },
+  {
+    id: 'music',
+    name: 'Music',
+    subtitle: 'Practice, theory & recording',
+    icon: '⊕',
+    color: { r: 0.5, g: 0.8, b: 0.9 },
+    hexColor: '#80ccee',
+    position: { x: 5, z: 0 },
+    status: 'planned',
+    activityLevel: 0.45,
+    structure: 'chapel',
+    artifacts: [
+      { title: 'Daily practice', status: 'planned', next: '20 minutes before the day starts' }
+    ]
+  }
+];
+
+// State vector — will be driven by Mac Mini in production
+const STATE = {
+  energy: 0.65,
+  momentum: 0.72,
+  risk: 0.28,
+  readiness: 0.58,
+  readoutState: 'flow_available',
+  readoutTask: 'Your Tech Builder tower is lit. One deep session awaits.'
+};
+
+// ─── BABYLON WORLD ──────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('renderCanvas');
+const engine = new BABYLON.Engine(canvas, true, {
+  preserveDrawingBuffer: true,
+  stencil: true,
+  antialias: true
+});
+
+let scene, camera, selectedEngine = null;
+const engineMeshes = new Map();
+const engineLights = new Map();
+const engineGlows = new Map();
+
+function createScene() {
+  scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color4(0.04, 0.04, 0.07, 1);
+  scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+  scene.fogDensity = 0.02;
+  scene.fogColor = new BABYLON.Color3(0.04, 0.04, 0.07);
+
+  // ── Camera ──
+  camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, Math.PI / 3.5, 22, BABYLON.Vector3.Zero(), scene);
+  camera.lowerRadiusLimit = 10;
+  camera.upperRadiusLimit = 40;
+  camera.upperBetaLimit = Math.PI / 2.2;
+  camera.lowerBetaLimit = 0.3;
+  camera.attachControl(canvas, true);
+  camera.wheelPrecision = 50;
+
+  // ── Ambient lighting ──
+  const ambient = new BABYLON.HemisphericLight('ambient', new BABYLON.Vector3(0, 1, 0), scene);
+  ambient.intensity = 0.12;
+  ambient.groundColor = new BABYLON.Color3(0.05, 0.04, 0.08);
+  ambient.diffuse = new BABYLON.Color3(0.4, 0.35, 0.3);
+
+  // ── Moon light ──
+  const moonLight = new BABYLON.DirectionalLight('moon', new BABYLON.Vector3(-0.5, -1, -0.3), scene);
+  moonLight.intensity = 0.3;
+  moonLight.diffuse = new BABYLON.Color3(0.6, 0.65, 0.8);
+
+  // ── Ground ──
+  buildGround();
+
+  // ── Keep (central structure) ──
+  buildKeep();
+
+  // ── Engine structures ──
+  ENGINES.forEach(eng => buildEngineStructure(eng));
+
+  // ── Pathways between structures ──
+  buildPathways();
+
+  // ── Atmosphere ──
+  buildAtmosphere();
+
+  // ── Glow layer ──
+  const glowLayer = new BABYLON.GlowLayer('glow', scene);
+  glowLayer.intensity = 0.6;
+
+  // ── Pointer events ──
+  scene.onPointerObservable.add(handlePointer);
+
+  return scene;
+}
+
+function buildGround() {
+  const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 40, height: 40, subdivisions: 8 }, scene);
+  const groundMat = new BABYLON.StandardMaterial('groundMat', scene);
+  groundMat.diffuseColor = new BABYLON.Color3(0.06, 0.055, 0.07);
+  groundMat.specularColor = new BABYLON.Color3(0, 0, 0);
+  ground.material = groundMat;
+  ground.receiveShadows = true;
+
+  // Stone tile pattern via grid texture approximation
+  const groundGrid = BABYLON.MeshBuilder.CreateGround('groundGrid', { width: 40, height: 40, subdivisions: 20 }, scene);
+  const gridMat = new BABYLON.StandardMaterial('gridMat', scene);
+  gridMat.wireframe = true;
+  gridMat.alpha = 0.04;
+  gridMat.diffuseColor = new BABYLON.Color3(0.8, 0.7, 0.5);
+  groundGrid.material = gridMat;
+  groundGrid.position.y = 0.01;
+}
+
+function buildKeep() {
+  // Central keep — the castle heart
+  const keepBase = BABYLON.MeshBuilder.CreateBox('keep', { width: 3, height: 2.5, depth: 3 }, scene);
+  keepBase.position.y = 1.25;
+  applyStonemat(keepBase, 0.12, 0.11, 0.14);
+
+  // Keep tower
+  const keepTower = BABYLON.MeshBuilder.CreateBox('keepTower', { width: 1.5, height: 4, depth: 1.5 }, scene);
+  keepTower.position.y = 4;
+  applyStonemat(keepTower, 0.10, 0.09, 0.12);
+
+  // Battlements
+  for (let i = 0; i < 4; i++) {
+    const crenel = BABYLON.MeshBuilder.CreateBox('crenel_' + i, { width: 0.3, height: 0.4, depth: 0.3 }, scene);
+    crenel.position.y = 6.2;
+    const angle = (i / 4) * Math.PI * 2;
+    crenel.position.x = Math.cos(angle) * 0.6;
+    crenel.position.z = Math.sin(angle) * 0.6;
+    applyStonemat(crenel, 0.10, 0.09, 0.12);
+  }
+
+  // Keep glow — reflects overall state
+  const keepLight = new BABYLON.PointLight('keepLight', new BABYLON.Vector3(0, 3, 0), scene);
+  keepLight.intensity = 0.8;
+  keepLight.range = 8;
+  // Color shifts with readout state
+  const stateColors = {
+    flow_available: new BABYLON.Color3(0.9, 0.85, 0.6),
+    low_energy: new BABYLON.Color3(0.3, 0.3, 0.5),
+    pre_crash: new BABYLON.Color3(0.8, 0.3, 0.2),
+    blocked_pattern: new BABYLON.Color3(0.6, 0.4, 0.2),
+    recovery: new BABYLON.Color3(0.4, 0.5, 0.7),
+    transition_ready: new BABYLON.Color3(0.7, 0.8, 0.6),
+    emergence: new BABYLON.Color3(0.6, 0.7, 0.9)
+  };
+  keepLight.diffuse = stateColors[STATE.readoutState] || stateColors.flow_available;
+}
+
+function buildEngineStructure(eng) {
+  const pos = eng.position;
+  const activity = eng.activityLevel;
+  const col = eng.color;
+  const meshGroup = [];
+
+  // Base structure — size scales with activity
+  const baseH = 0.8 + activity * 0.4;
+  const base = BABYLON.MeshBuilder.CreateBox(`${eng.id}_base`, {
+    width: 2 + activity * 0.5,
+    height: baseH,
+    depth: 2 + activity * 0.5
+  }, scene);
+  base.position.set(pos.x, baseH / 2, pos.z);
+  applyStonemat(base, 0.08 + activity * 0.04, 0.07 + activity * 0.03, 0.10 + activity * 0.03);
+  meshGroup.push(base);
+
+  // Tower/structure height scales with activity
+  if (eng.structure === 'tower' || eng.structure === 'library') {
+    const towerH = 2 + activity * 4;
+    const tower = BABYLON.MeshBuilder.CreateBox(`${eng.id}_tower`, {
+      width: 1.2,
+      height: towerH,
+      depth: 1.2
+    }, scene);
+    tower.position.set(pos.x, baseH + towerH / 2, pos.z);
+    applyStonemat(tower, 0.09 + activity * 0.03, 0.08 + activity * 0.02, 0.11 + activity * 0.04);
+    meshGroup.push(tower);
+
+    // Conical roof
+    const roof = BABYLON.MeshBuilder.CreateCylinder(`${eng.id}_roof`, {
+      diameterTop: 0,
+      diameterBottom: 1.6,
+      height: 1.2,
+      tessellation: 4
+    }, scene);
+    roof.position.set(pos.x, baseH + towerH + 0.6, pos.z);
+    const roofMat = new BABYLON.StandardMaterial(`${eng.id}_roofMat`, scene);
+    roofMat.diffuseColor = new BABYLON.Color3(col.r * 0.4, col.g * 0.4, col.b * 0.4);
+    roofMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    roof.material = roofMat;
+    meshGroup.push(roof);
+  }
+
+  if (eng.structure === 'vault' || eng.structure === 'hall') {
+    // Wide low structure
+    const hall = BABYLON.MeshBuilder.CreateBox(`${eng.id}_hall`, {
+      width: 3 + activity,
+      height: 1.5 + activity,
+      depth: 2
+    }, scene);
+    hall.position.set(pos.x, baseH + (1.5 + activity) / 2, pos.z);
+    applyStonemat(hall, 0.09, 0.08, 0.11);
+    meshGroup.push(hall);
+  }
+
+  if (eng.structure === 'workshop' || eng.structure === 'study' || eng.structure === 'chapel') {
+    // Medium structure with small tower
+    const body = BABYLON.MeshBuilder.CreateBox(`${eng.id}_body`, {
+      width: 1.8,
+      height: 1.5 + activity * 1.5,
+      depth: 1.8
+    }, scene);
+    body.position.set(pos.x, baseH + (1.5 + activity * 1.5) / 2, pos.z);
+    applyStonemat(body, 0.09 + activity * 0.03, 0.08, 0.12);
+    meshGroup.push(body);
+  }
+
+  if (eng.structure === 'garden') {
+    // Low organic structure — decays with neglect
+    const garden = BABYLON.MeshBuilder.CreateSphere(`${eng.id}_garden`, {
+      diameter: 1.5 + activity,
+      segments: 6
+    }, scene);
+    garden.position.set(pos.x, baseH + 0.5 + activity * 0.3, pos.z);
+    garden.scaling.y = 0.5;
+    const gardenMat = new BABYLON.StandardMaterial(`${eng.id}_gardenMat`, scene);
+    gardenMat.diffuseColor = new BABYLON.Color3(
+      0.1 + activity * 0.1,
+      0.2 + activity * 0.4,
+      0.1 + activity * 0.1
+    );
+    gardenMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    garden.material = gardenMat;
+    meshGroup.push(garden);
+  }
+
+  // Engine light — scales with activity, color matches engine
+  if (activity > 0.3) {
+    const light = new BABYLON.PointLight(`${eng.id}_light`, new BABYLON.Vector3(pos.x, 3, pos.z), scene);
+    light.intensity = activity * 1.2;
+    light.range = 4 + activity * 3;
+    light.diffuse = new BABYLON.Color3(col.r, col.g, col.b);
+    engineLights.set(eng.id, light);
+
+    // Window glow on active structures
+    const windowGlow = BABYLON.MeshBuilder.CreateBox(`${eng.id}_window`, {
+      width: 0.3,
+      height: 0.4,
+      depth: 0.1
+    }, scene);
+    windowGlow.position.set(pos.x + 0.6, 1.5, pos.z + 1.05);
+    const windowMat = new BABYLON.StandardMaterial(`${eng.id}_windowMat`, scene);
+    windowMat.diffuseColor = new BABYLON.Color3(col.r * 0.8, col.g * 0.8, col.b * 0.6);
+    windowMat.emissiveColor = new BABYLON.Color3(col.r * activity, col.g * activity, col.b * activity * 0.5);
+    windowMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    windowGlow.material = windowMat;
+    meshGroup.push(windowGlow);
+  }
+
+  // Blocked state: smoke/dark particles
+  if (eng.status === 'blocked') {
+    const particleSystem = new BABYLON.ParticleSystem(`${eng.id}_smoke`, 100, scene);
+    particleSystem.particleTexture = new BABYLON.Texture('https://assets.babylonjs.com/textures/flare.png', scene);
+    particleSystem.emitter = new BABYLON.Vector3(pos.x, 2, pos.z);
+    particleSystem.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
+    particleSystem.maxEmitBox = new BABYLON.Vector3(0.5, 0, 0.5);
+    particleSystem.color1 = new BABYLON.Color4(0.15, 0.12, 0.2, 0.3);
+    particleSystem.color2 = new BABYLON.Color4(0.1, 0.08, 0.15, 0);
+    particleSystem.minSize = 0.3;
+    particleSystem.maxSize = 0.8;
+    particleSystem.minLifeTime = 2;
+    particleSystem.maxLifeTime = 4;
+    particleSystem.emitRate = 15;
+    particleSystem.direction1 = new BABYLON.Vector3(-0.1, 1, -0.1);
+    particleSystem.direction2 = new BABYLON.Vector3(0.1, 1.5, 0.1);
+    particleSystem.minEmitPower = 0.1;
+    particleSystem.maxEmitPower = 0.3;
+    particleSystem.start();
+  }
+
+  // Active state: fire particles at chimney/base
+  if (eng.status === 'active' && activity > 0.5) {
+    const fireSystem = new BABYLON.ParticleSystem(`${eng.id}_fire`, 50, scene);
+    fireSystem.particleTexture = new BABYLON.Texture('https://assets.babylonjs.com/textures/flare.png', scene);
+    fireSystem.emitter = new BABYLON.Vector3(pos.x, 0.3, pos.z);
+    fireSystem.color1 = new BABYLON.Color4(col.r, col.g * 0.6, col.b * 0.2, 0.8);
+    fireSystem.color2 = new BABYLON.Color4(col.r * 0.5, col.g * 0.3, 0, 0);
+    fireSystem.minSize = 0.05;
+    fireSystem.maxSize = 0.2;
+    fireSystem.minLifeTime = 0.3;
+    fireSystem.maxLifeTime = 0.8;
+    fireSystem.emitRate = 30;
+    fireSystem.direction1 = new BABYLON.Vector3(-0.05, 1, -0.05);
+    fireSystem.direction2 = new BABYLON.Vector3(0.05, 1.5, 0.05);
+    fireSystem.minEmitPower = 0.5;
+    fireSystem.maxEmitPower = 1;
+    fireSystem.start();
+  }
+
+  // Store all meshes for picking
+  meshGroup.forEach(m => {
+    m.metadata = { engineId: eng.id };
+    engineMeshes.set(m.name, eng.id);
+  });
+
+  // Name label plane (invisible, used for picking target)
+  const label = BABYLON.MeshBuilder.CreatePlane(`${eng.id}_label`, { size: 3 }, scene);
+  label.position.set(pos.x, 0.1, pos.z);
+  label.rotation.x = Math.PI / 2;
+  label.isPickable = true;
+  label.metadata = { engineId: eng.id };
+  label.visibility = 0;
+  engineMeshes.set(label.name, eng.id);
+}
+
+function buildPathways() {
+  // Stone paths from keep to each engine
+  ENGINES.forEach(eng => {
+    const from = new BABYLON.Vector3(0, 0.02, 0);
+    const to = new BABYLON.Vector3(eng.position.x * 0.6, 0.02, eng.position.z * 0.6);
+    const path = BABYLON.MeshBuilder.CreateTube(`path_${eng.id}`, {
+      path: [from, to],
+      radius: 0.12,
+      tessellation: 4
+    }, scene);
+    const pathMat = new BABYLON.StandardMaterial(`pathMat_${eng.id}`, scene);
+
+    // Path brightness reflects edge weight (graph connection strength)
+    const weight = eng.activityLevel * 0.5;
+    pathMat.diffuseColor = new BABYLON.Color3(0.08 + weight, 0.07 + weight, 0.09 + weight);
+    pathMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    if (eng.activityLevel > 0.5) {
+      pathMat.emissiveColor = new BABYLON.Color3(
+        eng.color.r * weight * 0.3,
+        eng.color.g * weight * 0.3,
+        eng.color.b * weight * 0.3
+      );
+    }
+    path.material = pathMat;
+  });
+}
+
+function buildAtmosphere() {
+  // Stars
+  const starSystem = new BABYLON.ParticleSystem('stars', 500, scene);
+  starSystem.particleTexture = new BABYLON.Texture('https://assets.babylonjs.com/textures/flare.png', scene);
+  starSystem.emitter = new BABYLON.Vector3(0, 20, 0);
+  starSystem.minEmitBox = new BABYLON.Vector3(-30, -2, -30);
+  starSystem.maxEmitBox = new BABYLON.Vector3(30, 2, 30);
+  starSystem.color1 = new BABYLON.Color4(0.9, 0.9, 1, 0.6);
+  starSystem.color2 = new BABYLON.Color4(0.7, 0.8, 1, 0.3);
+  starSystem.minSize = 0.02;
+  starSystem.maxSize = 0.06;
+  starSystem.minLifeTime = 999;
+  starSystem.maxLifeTime = 999;
+  starSystem.emitRate = 500;
+  starSystem.gravity = new BABYLON.Vector3(0, 0, 0);
+  starSystem.direction1 = new BABYLON.Vector3(0, 0, 0);
+  starSystem.direction2 = new BABYLON.Vector3(0, 0, 0);
+  starSystem.minEmitPower = 0;
+  starSystem.maxEmitPower = 0;
+  starSystem.start();
+
+  // Ground mist — intensity based on risk
+  const mist = new BABYLON.ParticleSystem('mist', 200, scene);
+  mist.particleTexture = new BABYLON.Texture('https://assets.babylonjs.com/textures/flare.png', scene);
+  mist.emitter = new BABYLON.Vector3(0, 0.2, 0);
+  mist.minEmitBox = new BABYLON.Vector3(-15, 0, -15);
+  mist.maxEmitBox = new BABYLON.Vector3(15, 0.1, 15);
+  mist.color1 = new BABYLON.Color4(0.5, 0.5, 0.7, STATE.risk * 0.15);
+  mist.color2 = new BABYLON.Color4(0.4, 0.4, 0.6, 0);
+  mist.minSize = 2;
+  mist.maxSize = 5;
+  mist.minLifeTime = 6;
+  mist.maxLifeTime = 10;
+  mist.emitRate = Math.floor(20 + STATE.risk * 60);
+  mist.direction1 = new BABYLON.Vector3(-0.2, 0.1, -0.2);
+  mist.direction2 = new BABYLON.Vector3(0.2, 0.3, 0.2);
+  mist.minEmitPower = 0.1;
+  mist.maxEmitPower = 0.3;
+  mist.start();
+}
+
+function applyStonemat(mesh, r, g, b) {
+  const mat = new BABYLON.StandardMaterial(mesh.name + '_mat', scene);
+  mat.diffuseColor = new BABYLON.Color3(r, g, b);
+  mat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+  mesh.material = mat;
+  return mat;
+}
+
+// ─── INTERACTION ────────────────────────────────────────────────────────────
+
+let hoveredEngine = null;
+const tooltip = document.getElementById('tooltip');
+
+function handlePointer(pointerInfo) {
+  if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+    const pick = scene.pick(scene.pointerX, scene.pointerY);
+    if (pick.hit && pick.pickedMesh && pick.pickedMesh.metadata?.engineId) {
+      const engId = pick.pickedMesh.metadata.engineId;
+      const eng = ENGINES.find(e => e.id === engId);
+      if (eng && hoveredEngine !== engId) {
+        hoveredEngine = engId;
+        showTooltip(eng, scene.pointerX, scene.pointerY);
+      }
+      tooltip.style.left = (scene.pointerX + 16) + 'px';
+      tooltip.style.top = (scene.pointerY - 20) + 'px';
+    } else {
+      hoveredEngine = null;
+      tooltip.classList.remove('visible');
+    }
+  }
+
+  if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+    const pick = scene.pick(scene.pointerX, scene.pointerY);
+    if (pick.hit && pick.pickedMesh && pick.pickedMesh.metadata?.engineId) {
+      const engId = pick.pickedMesh.metadata.engineId;
+      const eng = ENGINES.find(e => e.id === engId);
+      if (eng) openPanel(eng);
+    }
+  }
+}
+
+function showTooltip(eng, x, y) {
+  document.getElementById('tooltip-name').textContent = `${eng.icon}  ${eng.name}`;
+  document.getElementById('tooltip-status').textContent = eng.subtitle;
+  const firstArtifact = eng.artifacts[0];
+  document.getElementById('tooltip-next').textContent = firstArtifact
+    ? `→ ${firstArtifact.next}`
+    : 'No active tasks';
+  tooltip.style.left = (x + 16) + 'px';
+  tooltip.style.top = (y - 20) + 'px';
+  tooltip.classList.add('visible');
+}
+
+function openPanel(eng) {
+  selectedEngine = eng;
+  document.getElementById('panel-engine-icon').textContent = eng.icon;
+  document.getElementById('panel-engine-name').textContent = eng.name;
+  document.getElementById('panel-engine-subtitle').textContent = eng.subtitle;
+
+  const artifactsEl = document.getElementById('panel-artifacts');
+  artifactsEl.innerHTML = eng.artifacts.map(a => `
+    <div class="artifact-card">
+      <div class="artifact-title">${a.title}</div>
+      <div class="artifact-next">${a.next}</div>
+      <span class="artifact-status status-${a.status}">${a.status}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('engine-panel').classList.add('open');
+
+  // Animate camera toward selected engine
+  const target = new BABYLON.Vector3(eng.position.x * 0.5, 0, eng.position.z * 0.5);
+  BABYLON.Animation.CreateAndStartAnimation(
+    'camTarget', camera, 'target',
+    30, 40, camera.target, target,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+}
+
+function closePanel() {
+  document.getElementById('engine-panel').classList.remove('open');
+  selectedEngine = null;
+  BABYLON.Animation.CreateAndStartAnimation(
+    'camHome', camera, 'target',
+    30, 40, camera.target, BABYLON.Vector3.Zero(),
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+}
+
+// ─── AMBIENT ANIMATION LOOP ─────────────────────────────────────────────────
+
+let tick = 0;
+scene && scene.registerBeforeRender(() => {
+  tick += 0.008;
+
+  // Gentle keep light pulse
+  const keepLight = scene.getLightByName('keepLight');
+  if (keepLight) {
+    keepLight.intensity = 0.7 + Math.sin(tick * 1.2) * 0.15 * STATE.energy;
+  }
+
+  // Engine lights breathe with activity
+  ENGINES.forEach(eng => {
+    const light = engineLights.get(eng.id);
+    if (light) {
+      const breathe = Math.sin(tick * (0.8 + eng.activityLevel) + eng.position.x) * 0.1;
+      light.intensity = eng.activityLevel * 1.2 + breathe;
+    }
+  });
+});
+
+// ─── STATE VECTOR UI ────────────────────────────────────────────────────────
+
+function updateStateUI(state) {
+  const bars = {
+    energy: state.energy,
+    momentum: state.momentum,
+    risk: state.risk,
+    readiness: state.readiness
+  };
+
+  Object.entries(bars).forEach(([key, val]) => {
+    const bar = document.getElementById(`bar-${key}`);
+    const valEl = document.getElementById(`val-${key}`);
+    if (bar) bar.style.width = (val * 100) + '%';
+    if (valEl) valEl.textContent = val.toFixed(2);
+  });
+
+  document.getElementById('readout-state').textContent =
+    state.readoutState.replace(/_/g, ' ');
+  document.getElementById('readout-task').textContent = state.readoutTask;
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
+const loadingBar = document.getElementById('loading-bar');
+let loadProgress = 0;
+const loadInterval = setInterval(() => {
+  loadProgress += Math.random() * 15;
+  if (loadProgress >= 100) {
+    loadProgress = 100;
+    clearInterval(loadInterval);
+  }
+  loadingBar.style.width = loadProgress + '%';
+}, 80);
+
+window.addEventListener('load', () => {
+  createScene();
+  updateStateUI(STATE);
+
+  // Register render loop after scene ready
+  scene.registerBeforeRender(() => {
+    tick += 0.008;
+    const keepLight = scene.getLightByName('keepLight');
+    if (keepLight) {
+      keepLight.intensity = 0.7 + Math.sin(tick * 1.2) * 0.15 * STATE.energy;
+    }
+    ENGINES.forEach(eng => {
+      const light = engineLights.get(eng.id);
+      if (light) {
+        const breathe = Math.sin(tick * (0.8 + eng.activityLevel) + eng.position.x) * 0.1;
+        light.intensity = eng.activityLevel * 1.2 + breathe;
+      }
+    });
+  });
+
+  engine.runRenderLoop(() => scene.render());
+  window.addEventListener('resize', () => engine.resize());
+
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('fade');
+    setTimeout(() => document.getElementById('loading').remove(), 1200);
+  }, 1800);
+});
+
+// Expose for future Mac Mini state vector updates
+window.updateCastleState = function(newState) {
+  Object.assign(STATE, newState);
+  updateStateUI(STATE);
+};
+</script>
+</body>
+</html>
