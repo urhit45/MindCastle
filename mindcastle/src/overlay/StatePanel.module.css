@@ -1,0 +1,64 @@
+.panel {
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.castleName {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--color-text-warm);
+  margin-bottom: 16px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-mid);
+  width: 72px;
+}
+
+.track {
+  width: 80px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  transition: width 2s ease;
+  position: relative;
+}
+
+.fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: 1px;
+  height: 6px;
+  background: inherit;
+  filter: brightness(2);
+}
+
+.value {
+  font-size: 10px;
+  color: var(--color-text-mid);
+  width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,35 @@
+{
+  "productName": "MindCastle",
+  "version": "0.1.0",
+  "identifier": "io.mindcastle.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "MindCastle",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.icns"],
+    "resources": []
+  }
+}
